@@ -1,14 +1,13 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, Manrope } from 'next/font/google'
+import { Outfit, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 import './globals.css'
 
-const manrope = Manrope({ subsets: ['latin'], variable: '--font-sans' })
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const outfit = Outfit({
   subsets: ['latin'],
+  variable: '--font-sans',
+  weight: ['400', '600', '700', '800', '900'],
 })
 
 const geistMono = Geist_Mono({
@@ -26,7 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html
       lang="es"
-      className={cn('dark h-full antialiased', geistSans.variable, geistMono.variable, manrope.variable, 'font-sans')}
+      className={cn('dark h-full antialiased', outfit.variable, geistMono.variable, 'font-sans')}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">

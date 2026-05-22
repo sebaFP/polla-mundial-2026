@@ -38,18 +38,50 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Logo */}
-        <div className="text-center space-y-2">
-          <div className="text-6xl">🏆</div>
-          <h1 className="text-3xl font-bold text-gradient-gold">Polla Mundial</h1>
-          <p className="text-muted-foreground">FIFA World Cup 2026</p>
+    <div className="relative min-h-screen gradient-bg flex items-center justify-center p-4 overflow-hidden">
+      {/* Geometric background pattern */}
+      <div className="pattern-geo absolute inset-0" />
+
+      {/* Decorative "26" backdrop */}
+      <div
+        className="absolute right-[-4rem] top-[-3rem] text-[20rem] font-black leading-none select-none pointer-events-none opacity-[0.04]"
+        style={{ color: '#2A398D' }}
+        aria-hidden
+      >
+        26
+      </div>
+
+      <div className="relative z-10 w-full max-w-md space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 mb-1">
+            <span className="text-xs font-black tracking-[0.3em] uppercase" style={{ color: '#E61D25' }}>FIFA</span>
+            <span className="text-xs font-black tracking-[0.3em] uppercase text-muted-foreground">·</span>
+            <span className="text-xs font-black tracking-[0.3em] uppercase" style={{ color: '#2A398D' }}>WORLD</span>
+            <span className="text-xs font-black tracking-[0.3em] uppercase text-muted-foreground">·</span>
+            <span className="text-xs font-black tracking-[0.3em] uppercase" style={{ color: '#3CAC3B' }}>CUP</span>
+          </div>
+
+          <h1 className="text-5xl font-black tracking-tight leading-none">
+            <span className="text-gradient-fifa">POLLA</span>
+            <br />
+            <span className="text-gradient-gold">MUNDIAL</span>
+          </h1>
+
+          <div className="flex items-center gap-3 justify-center">
+            <div className="fifa-stripe flex-1 max-w-16" />
+            <span className="text-2xl font-black text-foreground/30 tracking-widest">2026</span>
+            <div className="fifa-stripe flex-1 max-w-16" />
+          </div>
+
+          <p className="text-muted-foreground text-sm">
+            Canadá · Estados Unidos · México
+          </p>
         </div>
 
-        <Card className="glass-card border-border">
+        <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
           <CardHeader>
-            <CardTitle className="text-xl">Panel de Administración</CardTitle>
+            <CardTitle className="text-xl font-bold">Panel de Administración</CardTitle>
             <CardDescription>Ingresa con tus credenciales de admin</CardDescription>
           </CardHeader>
           <CardContent>
@@ -78,8 +110,8 @@ export default function LoginPage() {
                   autoComplete="current-password"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Ingresando...' : 'Ingresar'}
+              <Button type="submit" className="w-full font-bold tracking-wide" disabled={loading}>
+                {loading ? 'Ingresando...' : 'INGRESAR'}
               </Button>
             </form>
           </CardContent>
