@@ -41,6 +41,7 @@ const FILTER_TABS: { id: string; label: string }[] = [
 
 type Props = {
   initialParticipants: Participant[]
+  initialAdmins: User[]
   inscriptionEnabled: boolean
   inscriptionFee: number
   inscriptionCurrency: string
@@ -52,6 +53,7 @@ type Props = {
 
 export default function ParticipantsManager({
   initialParticipants,
+  initialAdmins,
   inscriptionEnabled,
   inscriptionFee,
   inscriptionCurrency,
@@ -61,6 +63,8 @@ export default function ParticipantsManager({
   prize3Pct,
 }: Props) {
   const [participants, setParticipants] = useState(initialParticipants)
+  const [admins, setAdmins] = useState(initialAdmins)
+  const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [creating, setCreating] = useState(false)
@@ -134,6 +138,26 @@ export default function ParticipantsManager({
       setNotesModal(null)
     } finally {
       setSavingNotes(false)
+    }
+  }
+
+  async function toggleAdminParticipation(userId: string, currentStatus: string | null) {
+    setTogglingAdmin(userId)
+    const newStatus = currentStatus === 'approved' ? 'pending' : 'approved'
+    try {
+      const res = await fetch('/api/admin/participants', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, inscriptionStatus: newStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      setAdmins(prev => prev.map(a => a.id === userId ? { ...a, inscriptionStatus: newStatus } : a))
+      toast.success(newStatus === 'approved' ? 'Admin habilitado como participante' : 'Admin deshabilitado del pool')
+    } catch {
+      toast.error('Error al actualizar')
+    } finally {
+      setTogglingAdmin(null)
     }
   }
 
@@ -334,6 +358,47 @@ export default function ParticipantsManager({
           )
         })}
       </div>
+
+      {/* Admins section */}
+      {admins.length > 0 && (
+        <div className="space-y-2 pt-4 border-t border-border">
+          <p className="text-sm font-semibold text-muted-foreground">Administradores en el pool</p>
+          <p className="text-xs text-muted-foreground">Los admins habilitados aparecen en el leaderboard y pueden hacer pronósticos.</p>
+          {admins.map(a => {
+            const isParticipant = a.inscriptionStatus === 'approved'
+            return (
+              <Card key={a.id} className="glass-card p-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-9 h-9 shrink-0">
+                    <AvatarFallback style={{ backgroundColor: a.avatarColor ?? '#6366f1', color: '#fff' }} className="text-xs font-bold">
+                      {a.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{a.name}</p>
+                    {a.email && <p className="text-xs text-muted-foreground truncate">{a.email}</p>}
+                  </div>
+
+                  <Badge variant={isParticipant ? 'default' : 'secondary'} className="text-xs shrink-0">
+                    {isParticipant ? 'Participante' : 'Solo admin'}
+                  </Badge>
+
+                  <Button
+                    size="sm"
+                    variant={isParticipant ? 'outline' : 'default'}
+                    className="text-xs shrink-0"
+                    disabled={togglingAdmin === a.id}
+                    onClick={() => toggleAdminParticipation(a.id, a.inscriptionStatus)}
+                  >
+                    {togglingAdmin === a.id ? '...' : isParticipant ? 'Deshabilitar' : 'Habilitar'}
+                  </Button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       {/* QR Modal */}
       <Dialog open={!!selectedQR} onOpenChange={open => !open && setSelectedQR(null)}>

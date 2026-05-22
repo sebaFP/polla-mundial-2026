@@ -14,7 +14,7 @@ const links = [
   { href: '/admin/admins', label: '🔐 Admins' },
 ]
 
-export default function AdminNav({ userName }: { userName: string }) {
+export default function AdminNav({ userName, isParticipant }: { userName: string; isParticipant: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -52,6 +52,14 @@ export default function AdminNav({ userName }: { userName: string }) {
                 </Link>
               )
             })}
+            {isParticipant && (
+              <Link
+                href="/predictions"
+                className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                🎯 Mis Pronósticos
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">

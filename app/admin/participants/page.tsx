@@ -7,8 +7,9 @@ import ParticipantsManager from '@/components/admin/ParticipantsManager'
 export const revalidate = 0
 
 export default async function ParticipantsPage() {
-  const [allUsers, pts, invs, configRows] = await Promise.all([
+  const [allUsers, allAdmins, pts, invs, configRows] = await Promise.all([
     db.select().from(users).where(eq(users.role, 'participant')),
+    db.select().from(users).where(eq(users.role, 'admin')),
     db
       .select({
         userId: predictions.userId,
@@ -42,6 +43,7 @@ export default async function ParticipantsPage() {
       </div>
       <ParticipantsManager
         initialParticipants={participants}
+        initialAdmins={allAdmins}
         inscriptionEnabled={config.inscription_enabled === 'true'}
         inscriptionFee={parseInt(config.inscription_fee ?? '0') || 0}
         inscriptionCurrency={config.inscription_currency ?? 'CLP'}
