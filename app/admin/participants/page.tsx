@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { users, predictions, tournamentConfig } from '@/lib/db/schema'
+import { users, invitations, predictions, tournamentConfig } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { DEFAULT_CONFIG } from '@/lib/scoring'
 import ParticipantsManager from '@/components/admin/ParticipantsManager'
@@ -7,7 +7,7 @@ import ParticipantsManager from '@/components/admin/ParticipantsManager'
 export const revalidate = 0
 
 export default async function ParticipantsPage() {
-  const [allUsers, pts, configRows] = await Promise.all([
+  const [allUsers, pts, invs, configRows] = await Promise.all([
     db.select().from(users).where(eq(users.role, 'participant')),
     db
       .select({
@@ -17,16 +17,19 @@ export default async function ParticipantsPage() {
       })
       .from(predictions)
       .groupBy(predictions.userId),
+    db.select({ userId: invitations.userId, token: invitations.token }).from(invitations),
     db.select().from(tournamentConfig),
   ])
 
   const config = { ...DEFAULT_CONFIG, ...Object.fromEntries(configRows.map(r => [r.key, r.value])) }
   const ptsMap = Object.fromEntries(pts.map(r => [r.userId, { total: Number(r.total), predicted: Number(r.predicted) }]))
+  const tokenMap = Object.fromEntries(invs.map(i => [i.userId, i.token]))
 
   const participants = allUsers.map(u => ({
     ...u,
     totalPoints: ptsMap[u.id]?.total ?? 0,
     predictedMatches: ptsMap[u.id]?.predicted ?? 0,
+    qrToken: tokenMap[u.id] ?? null,
   }))
 
   return (

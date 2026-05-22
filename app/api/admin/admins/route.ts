@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
-import { eq, and, ne } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import bcrypt from 'bcryptjs'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET() {
   const session = await getSession()
@@ -31,19 +31,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Contraseña mínimo 8 caracteres' }, { status: 400 })
   }
 
-  // Check email not taken
-  const existing = await db.select().from(users).where(eq(users.email, email.trim())).limit(1)
-  if (existing.length > 0) {
-    return NextResponse.json({ error: 'Email ya está en uso' }, { status: 409 })
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email: email.trim().toLowerCase(),
+    password,
+    email_confirm: true,
+    user_metadata: { name: name.trim() },
+    app_metadata: { role: 'admin' },
+  })
+
+  if (authError || !authData.user) {
+    if (authError?.message?.includes('already registered')) {
+      return NextResponse.json({ error: 'Email ya está en uso' }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Error creando administrador' }, { status: 500 })
   }
 
-  const passwordHash = await bcrypt.hash(password, 12)
-
-  const created = await db.insert(users).values({
+  const [created] = await db.insert(users).values({
+    id: authData.user.id,
     name: name.trim(),
     email: email.trim().toLowerCase(),
     role: 'admin',
-    passwordHash,
   }).returning({
     id: users.id,
     name: users.name,
@@ -51,7 +58,7 @@ export async function POST(req: NextRequest) {
     createdAt: users.createdAt,
   })
 
-  return NextResponse.json(created[0], { status: 201 })
+  return NextResponse.json(created, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {
@@ -62,6 +69,7 @@ export async function DELETE(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
   if (userId === session.userId) return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
 
+  await supabaseAdmin.auth.admin.deleteUser(userId)
   await db.delete(users).where(and(eq(users.id, userId), eq(users.role, 'admin')))
   return NextResponse.json({ ok: true })
 }
@@ -74,7 +82,8 @@ export async function PATCH(req: NextRequest) {
   if (!userId || !password) return NextResponse.json({ error: 'userId y password requeridos' }, { status: 400 })
   if (password.length < 8) return NextResponse.json({ error: 'Mínimo 8 caracteres' }, { status: 400 })
 
-  const passwordHash = await bcrypt.hash(password, 12)
-  await db.update(users).set({ passwordHash }).where(and(eq(users.id, userId), eq(users.role, 'admin')))
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password })
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
   return NextResponse.json({ ok: true })
 }

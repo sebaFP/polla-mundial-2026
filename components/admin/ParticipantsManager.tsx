@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
 
-type Participant = User & { totalPoints: number; predictedMatches: number }
+type Participant = User & { totalPoints: number; predictedMatches: number; qrToken: string | null }
 
 type InscriptionStatus = 'pending' | 'confirmed' | 'approved' | 'rejected'
 

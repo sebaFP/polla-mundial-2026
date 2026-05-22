@@ -15,20 +15,56 @@ pnpm lint         # ESLint check
 pnpm db:push      # push Drizzle schema to Supabase (no migration files)
 pnpm db:generate  # generate migration SQL files
 pnpm db:studio    # open Drizzle Studio (DB browser)
-pnpm seed         # seed 104 World Cup 2026 matches from openfootball/worldcup.json
+pnpm db:reset     # ⚠️  WIPE all tables + all Supabase Auth users
+
+pnpm seed         # seed 104 WC 2026 matches + default tournament config
+pnpm seed:admin   # create first admin (reads ADMIN_EMAIL / ADMIN_PASSWORD from .env)
+```
+
+### Fresh start sequence
+```bash
+pnpm db:reset     # wipe everything
+pnpm db:push      # recreate schema from Drizzle
+pnpm seed         # 104 matches + config
+pnpm seed:admin   # first admin user
 ```
 
 ## Architecture
 
 ### Auth
-- `proxy.ts` — Next.js 16 route protection (replaces `middleware.ts`). Exports `proxy` function, not `middleware`.
-- `lib/auth/session.ts` — JWT with `jose`. Cookie name: `polla_session`. httpOnly, sameSite: lax.
-- `/join/[token]` — QR landing page. Reads `qr_token` from DB → sets JWT → redirects to `/predictions`.
-- Admin login: email + password from env vars (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- `proxy.ts` — Next.js 16 route protection. Uses `@supabase/ssr` to validate sessions. Reads `role` from `user.app_metadata.role` (no DB query).
+- `lib/auth/session.ts` — `getSession()` calls `supabase.auth.getUser()`. Returns `{ userId, role, name }`. Role from `app_metadata`, name from `user_metadata`.
+- `lib/supabase/server.ts` — `createSupabaseServerClient()` for Server Components / Route Handlers.
+- `lib/supabase/admin.ts` — `supabaseAdmin` with `service_role` key. Server-only. Used to create/delete users.
+- `/join/[token]` — QR landing page. Looks up `invitations` table → `signInWithPassword(p-{token}@polla.internal, token)` → session set via `@supabase/ssr` cookies.
+- Admin login: `supabase.auth.signInWithPassword` with real email. Admin must exist in Supabase Auth with `app_metadata.role = 'admin'`.
+
+#### QR auth mechanic
+Each participant has a Supabase Auth user with:
+- `email`: `p-{qrToken}@polla.internal` (internal, never exposed)
+- `password`: the QR token UUID itself
+- `app_metadata.role`: `'participant'`
+- `user_metadata.name`: display name
+
+QR token stored in `invitations.token`. Scanning the QR → `/join/{token}` → `signInWithPassword`.
+
+#### First admin setup
+Create admin in Supabase Auth via dashboard or:
+```ts
+supabaseAdmin.auth.admin.createUser({
+  email: 'admin@example.com',
+  password: 'secure-password',
+  email_confirm: true,
+  user_metadata: { name: 'Admin' },
+  app_metadata: { role: 'admin' },
+})
+// Then insert into users table with the returned id
+```
 
 ### Database (Drizzle + Supabase PostgreSQL)
 Schema in `lib/db/schema.ts`:
-- `users` — participants + admin. `role`: `'admin'|'participant'`. `qr_token`: unique UUID for QR login.
+- `users` — participants + admin. `id` matches `auth.users.id` (Supabase Auth UID). `role`: `'admin'|'participant'`. No `qr_token` or `passwordHash` — those are in Supabase Auth.
+- `invitations` — QR tokens. `token` UUID → participant login. `used_at` tracks first use. `user_id` references `users.id`.
 - `matches` — 104 WC matches. `stage`: `GROUP_STAGE|LAST_32|LAST_16|QUARTER_FINALS|SEMI_FINALS|THIRD_PLACE|FINAL`. `lock_time`: 15 min before match (configurable). `team1_resolved`/`team2_resolved`: false for knockout until bracket is known.
 - `predictions` — score predictions per user per match. `points` is null until result entered.
 - `group_predictions` — 1st/2nd place per group per user.
@@ -72,8 +108,8 @@ All values configurable from `/admin/config`.
 
 ### Route Groups
 - `(auth)/login` — public, no layout
-- `(participant)/*` — requires any valid JWT, shows ParticipantNav
-- `admin/*` — requires JWT with `role: 'admin'`, shows AdminNav
+- `(participant)/*` — requires valid Supabase session, shows ParticipantNav
+- `admin/*` — requires Supabase session with `app_metadata.role: 'admin'`, shows AdminNav
 
 ## Key Conventions
 
@@ -103,9 +139,9 @@ All required in `.env.local` (and in Vercel env vars for production):
 |---|---|
 | `DATABASE_URL` | Supabase pooler connection string |
 | `DIRECT_URL` | Supabase direct connection (for migrations) |
-| `JWT_SECRET` | Random 32+ char string for JWT signing |
-| `ADMIN_EMAIL` | Admin login email |
-| `ADMIN_PASSWORD` | Admin login password (plain text, checked server-side) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL (Settings → API) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon public key (Settings → API) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key — server-only, never expose to browser |
 | `NEXT_PUBLIC_APP_URL` | Full app URL (e.g. `https://polla.vercel.app`) |
 | `FOOTBALL_DATA_API_KEY` | football-data.org free API key |
 | `CRON_SECRET` | Random string to protect `/api/cron/sync-results` |
