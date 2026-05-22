@@ -15,7 +15,18 @@ pnpm lint         # ESLint check
 pnpm db:push      # push Drizzle schema to Supabase (no migration files)
 pnpm db:generate  # generate migration SQL files
 pnpm db:studio    # open Drizzle Studio (DB browser)
-pnpm seed         # seed 104 World Cup 2026 matches from openfootball/worldcup.json
+pnpm db:reset     # ⚠️  WIPE all tables + all Supabase Auth users
+
+pnpm seed         # seed 104 WC 2026 matches + default tournament config
+pnpm seed:admin   # create first admin (reads ADMIN_EMAIL / ADMIN_PASSWORD from .env)
+```
+
+### Fresh start sequence
+```bash
+pnpm db:reset     # wipe everything
+pnpm db:push      # recreate schema from Drizzle
+pnpm seed         # 104 matches + config
+pnpm seed:admin   # first admin user
 ```
 
 ## Architecture
