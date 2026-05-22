@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { matches, predictions, groupStandings, groupPredictions, pollas } from '@/lib/db/schema'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, gte, lte } from 'drizzle-orm'
 import { getCompetitionMatches, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
 import { getPollaConfig } from '@/lib/polla'
@@ -112,66 +112,107 @@ async function recalcGroupPredictions(groupName: string) {
   }
 }
 
+// Normalize FD API group names ("Group A") to DB format ("GROUP_A")
+function normalizeGroup(group: string | null): string | null {
+  if (!group) return null
+  return group.toUpperCase().replace(/ /g, '_')
+}
+
 async function syncCompetition(
   competitionCode: string,
   competitionId: number,
   result: SyncResult,
 ) {
-  // Get existing externalIds for this competition to detect new vs updated
-  const existingRows = await db.select({ externalId: matches.externalId })
-    .from(matches)
-    .where(eq(matches.competitionId, competitionId))
-  const existingIds = new Set(existingRows.map(r => r.externalId).filter(Boolean))
+  // Load all existing matches for this competition (by externalId and by id)
+  const existingRows = await db.select({
+    id:           matches.id,
+    externalId:   matches.externalId,
+    matchDatetime: matches.matchDatetime,
+    team1:        matches.team1,
+    team2:        matches.team2,
+  }).from(matches).where(eq(matches.competitionId, competitionId))
 
-  // Fetch ALL matches (no status filter) — seeds new ones + updates existing in one pass
+  // Index by externalId for fast lookup
+  const byExternalId = new Map(existingRows.filter(r => r.externalId).map(r => [r.externalId!, r]))
+
+  // Index by "date+team1+team2" to detect seeded rows with fake externalIds
+  const byTeamDate = new Map(existingRows.map(r => {
+    const d = r.matchDatetime ? new Date(r.matchDatetime).toISOString().slice(0, 16) : ''
+    return [`${d}|${r.team1}|${r.team2}`, r]
+  }))
+
   const fdMatches = await getCompetitionMatches(competitionCode)
 
   for (const fdm of fdMatches) {
     try {
       const externalId = String(fdm.id)
-      const lockTime = new Date(new Date(fdm.utcDate).getTime() - 15 * 60 * 1000)
-
+      const matchDatetime = new Date(fdm.utcDate)
+      const lockTime = new Date(matchDatetime.getTime() - 15 * 60 * 1000)
       const newScore1 = fdm.score.fullTime.home
       const newScore2 = fdm.score.fullTime.away
       const newStatus = fdm.status
-      const isNew = !existingIds.has(externalId)
+      const groupName = normalizeGroup(fdm.group)
 
-      const [upserted] = await db.insert(matches).values({
-        externalId,
-        competitionId,
-        stage:         fdm.stage,
-        groupName:     fdm.group ?? null,
-        matchday:      fdm.matchday ?? null,
-        matchDatetime: new Date(fdm.utcDate),
-        team1:         fdm.homeTeam.name,
-        team2:         fdm.awayTeam.name,
-        team1Resolved: true,
-        team2Resolved: true,
-        venue:         fdm.venue ?? null,
-        status:        newStatus,
-        score1:        newScore1,
-        score2:        newScore2,
-        score1Ht:      fdm.score.halfTime.home,
-        score2Ht:      fdm.score.halfTime.away,
-        lockTime,
-      })
-      .onConflictDoUpdate({
-        target: matches.externalId,
-        set: {
-          status:    newStatus,
-          score1:    newScore1,
-          score2:    newScore2,
-          score1Ht:  fdm.score.halfTime.home,
-          score2Ht:  fdm.score.halfTime.away,
-          updatedAt: new Date(),
-        },
-      })
-      .returning()
+      // Check if already tracked by externalId
+      let existing = byExternalId.get(externalId) ?? null
+
+      // If not, check if a seeded row exists with same date+teams (fake externalId)
+      if (!existing) {
+        const dateKey = `${matchDatetime.toISOString().slice(0, 16)}|${fdm.homeTeam.name}|${fdm.awayTeam.name}`
+        existing = byTeamDate.get(dateKey) ?? null
+        if (existing) {
+          // Migrate: stamp this row with the real FD externalId so future syncs find it directly
+          await db.update(matches)
+            .set({ externalId, competitionId, updatedAt: new Date() })
+            .where(eq(matches.id, existing.id))
+          byExternalId.set(externalId, existing)
+        }
+      }
+
+      let upserted: typeof matches.$inferSelect | undefined
+
+      if (existing) {
+        // Update existing row
+        const [updated] = await db.update(matches)
+          .set({
+            status:    newStatus,
+            score1:    newScore1,
+            score2:    newScore2,
+            score1Ht:  fdm.score.halfTime.home,
+            score2Ht:  fdm.score.halfTime.away,
+            groupName,
+            updatedAt: new Date(),
+          })
+          .where(eq(matches.id, existing.id))
+          .returning()
+        upserted = updated
+        result.updated++
+      } else {
+        // Insert new row
+        const [inserted] = await db.insert(matches).values({
+          externalId,
+          competitionId,
+          stage:         fdm.stage,
+          groupName,
+          matchday:      fdm.matchday ?? null,
+          matchDatetime,
+          team1:         fdm.homeTeam.name,
+          team2:         fdm.awayTeam.name,
+          team1Resolved: true,
+          team2Resolved: true,
+          venue:         fdm.venue ?? null,
+          status:        newStatus,
+          score1:        newScore1,
+          score2:        newScore2,
+          score1Ht:      fdm.score.halfTime.home,
+          score2Ht:      fdm.score.halfTime.away,
+          lockTime,
+        }).returning()
+        upserted = inserted
+        result.seeded++
+      }
 
       if (!upserted) continue
-
-      if (isNew) result.seeded++
-      else result.updated++
 
       // Always recalculate predictions for finished matches (idempotent)
       if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {

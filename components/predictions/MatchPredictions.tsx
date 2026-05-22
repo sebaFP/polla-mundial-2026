@@ -123,7 +123,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
                   : 'bg-card border border-border text-muted-foreground hover:text-foreground'
               }`}
             >
-              {g.replace('Group ', 'G')}
+              {g.replace('GROUP_', 'G').replace('Group ', 'G')}
             </button>
           ))}
         </div>
