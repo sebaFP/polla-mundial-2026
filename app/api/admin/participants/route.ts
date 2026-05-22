@@ -65,18 +65,25 @@ export async function POST(req: NextRequest) {
   const count = await db.select({ c: sql<number>`COUNT(*)` }).from(users).where(eq(users.role, 'participant'))
   const idx = Number(count[0].c)
 
-  const [created] = await db.insert(users).values({
-    id: authData.user.id,
-    name: name.trim(),
-    email: email?.trim() || null,
-    role: 'participant',
-    avatarColor: getAvatarColor(idx),
-  }).returning()
+  let created, invitation
+  try {
+    ;[created] = await db.insert(users).values({
+      id: authData.user.id,
+      name: name.trim(),
+      email: email?.trim() || null,
+      role: 'participant',
+      avatarColor: getAvatarColor(idx),
+    }).returning()
 
-  const [invitation] = await db.insert(invitations).values({
-    userId: created.id,
-    token: qrToken,
-  }).returning()
+    ;[invitation] = await db.insert(invitations).values({
+      userId: created.id,
+      token: qrToken,
+    }).returning()
+  } catch (err) {
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    console.error('DB insert failed, auth user rolled back:', err)
+    return NextResponse.json({ error: 'Error creando usuario' }, { status: 500 })
+  }
 
   return NextResponse.json({ ...created, qrToken: invitation.token }, { status: 201 })
 }
@@ -88,9 +95,9 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
-  // Delete from Supabase Auth first (cascades to app users via ON DELETE CASCADE)
-  await supabaseAdmin.auth.admin.deleteUser(userId)
-  await db.delete(users).where(eq(users.id, userId))
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (deleteError) return NextResponse.json({ error: 'Error eliminando usuario' }, { status: 500 })
 
+  await db.delete(users).where(eq(users.id, userId))
   return NextResponse.json({ ok: true })
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { invitations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, isNull, or } from 'drizzle-orm'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // QR login: token is both the invitation lookup key and the Supabase Auth password
@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
     const { token } = await req.json()
     if (!token) return NextResponse.json({ error: 'Token requerido' }, { status: 400 })
 
-    const found = await db.select().from(invitations).where(eq(invitations.token, token)).limit(1)
+    const found = await db.select().from(invitations).where(
+      and(eq(invitations.token, token), or(isNull(invitations.expiresAt), gt(invitations.expiresAt, new Date())))
+    ).limit(1)
     if (found.length === 0) {
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
     }

@@ -1,13 +1,15 @@
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { invitations } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, isNull, or } from 'drizzle-orm'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function JoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
 
-  const found = await db.select().from(invitations).where(eq(invitations.token, token)).limit(1)
+  const found = await db.select().from(invitations).where(
+    and(eq(invitations.token, token), or(isNull(invitations.expiresAt), gt(invitations.expiresAt, new Date())))
+  ).limit(1)
 
   if (found.length === 0) {
     redirect('/login?error=invalid-token')
