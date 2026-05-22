@@ -117,7 +117,13 @@ async function syncCompetition(
   competitionId: number,
   result: SyncResult,
 ) {
-  // Fetch ALL matches for this competition (no status filter) — seeds new ones + updates existing
+  // Get existing externalIds for this competition to detect new vs updated
+  const existingRows = await db.select({ externalId: matches.externalId })
+    .from(matches)
+    .where(eq(matches.competitionId, competitionId))
+  const existingIds = new Set(existingRows.map(r => r.externalId).filter(Boolean))
+
+  // Fetch ALL matches (no status filter) — seeds new ones + updates existing in one pass
   const fdMatches = await getCompetitionMatches(competitionCode)
 
   for (const fdm of fdMatches) {
@@ -128,8 +134,8 @@ async function syncCompetition(
       const newScore1 = fdm.score.fullTime.home
       const newScore2 = fdm.score.fullTime.away
       const newStatus = fdm.status
+      const isNew = !existingIds.has(externalId)
 
-      // Upsert: insert if new, update scores/status if existing
       const [upserted] = await db.insert(matches).values({
         externalId,
         competitionId,
@@ -164,19 +170,17 @@ async function syncCompetition(
 
       if (!upserted) continue
 
-      const wasNew = upserted.createdAt && upserted.updatedAt &&
-        Math.abs(upserted.createdAt.getTime() - upserted.updatedAt.getTime()) < 1000
+      if (isNew) result.seeded++
+      else result.updated++
 
-      if (wasNew) {
-        result.seeded++
-      } else if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
+      // Always recalculate predictions for finished matches (idempotent)
+      if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
         await recalcMatchPredictions(upserted.id, newScore1, newScore2)
 
         if (upserted.stage === 'GROUP_STAGE' && upserted.groupName) {
           await updateGroupStandings(upserted.groupName, upserted.team1, upserted.team2, newScore1, newScore2)
           await recalcGroupPredictions(upserted.groupName)
         }
-        result.updated++
       }
     } catch (err) {
       result.errors.push(`Match ${fdm.id}: ${String(err)}`)
