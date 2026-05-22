@@ -56,6 +56,8 @@ async function main() {
       group_standings,
       tournament_config,
       matches,
+      polla_members,
+      pollas,
       users
     CASCADE
   `)
@@ -65,8 +67,8 @@ async function main() {
   console.log('')
   console.log('🎉 Done. Now run:')
   console.log('   pnpm db:push     → recreate schema')
-  console.log('   pnpm seed        → seed 104 matches + config')
   console.log('   pnpm seed:admin  → create first admin user')
+  console.log('   Create a polla → Sync API → matches seeded automatically')
 }
 
 main().catch(err => {
