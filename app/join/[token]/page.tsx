@@ -1,25 +1,30 @@
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
+import { invitations } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { createToken, setSessionCookie } from '@/lib/auth/session'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function JoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
 
-  const found = await db.select().from(users).where(eq(users.qrToken, token)).limit(1)
+  const found = await db.select().from(invitations).where(eq(invitations.token, token)).limit(1)
 
   if (found.length === 0) {
     redirect('/login?error=invalid-token')
   }
 
-  const user = found[0]
-  const jwt = await createToken({
-    userId: user.id,
-    role: user.role as 'admin' | 'participant',
-    name: user.name,
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: `p-${token}@polla.internal`,
+    password: token,
   })
 
-  await setSessionCookie(jwt)
+  if (error || !data.user) {
+    redirect('/login?error=invalid-token')
+  }
+
+  // Mark as used
+  await db.update(invitations).set({ usedAt: new Date() }).where(eq(invitations.token, token))
+
   redirect('/predictions')
 }

@@ -1,8 +1,5 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
-
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? 'fallback-dev-secret')
-const COOKIE_NAME = 'polla_session'
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -19,38 +16,48 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const token = req.cookies.get(COOKIE_NAME)?.value
+  let response = NextResponse.next({ request: req })
 
-  if (!token) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
+          response = NextResponse.next({ request: req })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  try {
-    const { payload } = await jwtVerify(token, SECRET)
-    const role = payload.role as string
+  const role = user.app_metadata?.role as string | undefined
 
-    // Admin routes require admin role
-    if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin/')) {
-      if (role !== 'admin') {
-        if (pathname.startsWith('/api/')) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
-        return NextResponse.redirect(new URL('/predictions', req.url))
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin/')) {
+    if (role !== 'admin') {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
+      return NextResponse.redirect(new URL('/predictions', req.url))
     }
-
-    return NextResponse.next()
-  } catch {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const res = NextResponse.redirect(new URL('/login', req.url))
-    res.cookies.delete(COOKIE_NAME)
-    return res
   }
+
+  return response
 }
 
 export const config = {

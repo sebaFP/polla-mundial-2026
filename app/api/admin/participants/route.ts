@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, predictions, groupPredictions, specialPredictions } from '@/lib/db/schema'
+import { users, invitations, predictions } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getAvatarColor } from '@/lib/teams'
 import { randomUUID } from 'crypto'
 
@@ -22,9 +23,16 @@ export async function GET() {
 
   const ptsMap = Object.fromEntries(pts.map(r => [r.userId, Number(r.total)]))
 
+  // Attach QR tokens from invitations
+  const invs = await db.select({ userId: invitations.userId, token: invitations.token })
+    .from(invitations)
+
+  const tokenMap = Object.fromEntries(invs.map(i => [i.userId, i.token]))
+
   const result = allUsers.map(u => ({
     ...u,
     totalPoints: ptsMap[u.id] ?? 0,
+    qrToken: tokenMap[u.id] ?? null,
   }))
 
   return NextResponse.json(result)
@@ -37,18 +45,40 @@ export async function POST(req: NextRequest) {
   const { name, email } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
 
+  const qrToken = randomUUID()
+  const internalEmail = `p-${qrToken}@polla.internal`
+
+  // Create Supabase Auth user with QR token as password
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email: internalEmail,
+    password: qrToken,
+    email_confirm: true,
+    user_metadata: { name: name.trim() },
+    app_metadata: { role: 'participant' },
+  })
+
+  if (authError || !authData.user) {
+    console.error(authError)
+    return NextResponse.json({ error: 'Error creando usuario' }, { status: 500 })
+  }
+
   const count = await db.select({ c: sql<number>`COUNT(*)` }).from(users).where(eq(users.role, 'participant'))
   const idx = Number(count[0].c)
 
-  const created = await db.insert(users).values({
+  const [created] = await db.insert(users).values({
+    id: authData.user.id,
     name: name.trim(),
     email: email?.trim() || null,
     role: 'participant',
-    qrToken: randomUUID(),
     avatarColor: getAvatarColor(idx),
   }).returning()
 
-  return NextResponse.json(created[0], { status: 201 })
+  const [invitation] = await db.insert(invitations).values({
+    userId: created.id,
+    token: qrToken,
+  }).returning()
+
+  return NextResponse.json({ ...created, qrToken: invitation.token }, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {
@@ -58,6 +88,9 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
+  // Delete from Supabase Auth first (cascades to app users via ON DELETE CASCADE)
+  await supabaseAdmin.auth.admin.deleteUser(userId)
   await db.delete(users).where(eq(users.id, userId))
+
   return NextResponse.json({ ok: true })
 }

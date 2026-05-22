@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
 
-type Participant = User & { totalPoints: number; predictedMatches: number }
+type Participant = User & { totalPoints: number; predictedMatches: number; qrToken: string | null }
 
 export default function ParticipantsManager({ initialParticipants }: { initialParticipants: Participant[] }) {
   const [participants, setParticipants] = useState(initialParticipants)

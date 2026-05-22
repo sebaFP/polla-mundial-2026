@@ -4,13 +4,24 @@ import {
 } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey(), // matches auth.users.id from Supabase Auth — never auto-generated
   name: text('name').notNull(),
-  email: text('email'),
+  email: text('email'), // real email for admins; null for participants
   role: text('role').notNull().default('participant'),
-  qrToken: text('qr_token').unique(),
   avatarColor: text('avatar_color'),
+  inscriptionStatus: text('inscription_status').default('pending'), // 'pending' | 'confirmed' | 'approved' | 'rejected'
+  inscriptionNotes: text('inscription_notes'),
   createdAt: timestamp('created_at').defaultNow(),
+})
+
+// QR invitation tokens — one per participant, separate from auth credentials
+export const invitations = pgTable('invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: uuid('token').notNull().unique().defaultRandom(),
+  createdAt: timestamp('created_at').defaultNow(),
+  usedAt: timestamp('used_at'),
+  expiresAt: timestamp('expires_at'),
 })
 
 export const matches = pgTable('matches', {
@@ -88,6 +99,7 @@ export const tournamentConfig = pgTable('tournament_config', {
 })
 
 export type User = typeof users.$inferSelect
+export type Invitation = typeof invitations.$inferSelect
 export type Match = typeof matches.$inferSelect
 export type Prediction = typeof predictions.$inferSelect
 export type GroupPrediction = typeof groupPredictions.$inferSelect

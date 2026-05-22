@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { users, predictions } from '@/lib/db/schema'
+import { users, invitations, predictions } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import ParticipantsManager from '@/components/admin/ParticipantsManager'
 
@@ -17,12 +17,16 @@ export default async function ParticipantsPage() {
     .from(predictions)
     .groupBy(predictions.userId)
 
+  const invs = await db.select({ userId: invitations.userId, token: invitations.token }).from(invitations)
+
   const ptsMap = Object.fromEntries(pts.map(r => [r.userId, { total: Number(r.total), predicted: Number(r.predicted) }]))
+  const tokenMap = Object.fromEntries(invs.map(i => [i.userId, i.token]))
 
   const participants = allUsers.map(u => ({
     ...u,
     totalPoints: ptsMap[u.id]?.total ?? 0,
     predictedMatches: ptsMap[u.id]?.predicted ?? 0,
+    qrToken: tokenMap[u.id] ?? null,
   }))
 
   return (
