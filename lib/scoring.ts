@@ -43,6 +43,8 @@ export function calcSpecialPoints(
     case 'finalist': return getConfigValue(config, 'points_finalist', 10)
     case 'third': return getConfigValue(config, 'points_third_place', 8)
     case 'top_scorer': return getConfigValue(config, 'points_top_scorer', 15)
+    case 'best_goalkeeper': return getConfigValue(config, 'points_best_goalkeeper', 15)
+    case 'best_player': return getConfigValue(config, 'points_best_player', 15)
     default: return 0
   }
 }
@@ -60,6 +62,10 @@ export const DEFAULT_CONFIG: Config = {
   feature_group_predictions: 'true',
   feature_special_predictions: 'true',
   feature_top_scorer: 'false',
+  points_best_goalkeeper: '15',
+  feature_best_goalkeeper: 'false',
+  points_best_player: '15',
+  feature_best_player: 'false',
   prediction_lock_minutes: '15',
   polla_open: 'true',
   rules_text: '',

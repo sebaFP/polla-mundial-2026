@@ -38,6 +38,8 @@ const SPECIAL_ITEMS: ConfigItem[] = [
   { key: 'points_finalist', label: 'Finalista (perdedor)', description: 'Acierta el finalista que pierde', type: 'points', min: 0, max: 30 },
   { key: 'points_third_place', label: '3° Lugar', description: 'Acierta el ganador del tercer puesto', type: 'points', min: 0, max: 20 },
   { key: 'points_top_scorer', label: 'Goleador del Torneo', description: 'Acierta el máximo goleador', type: 'points', min: 0, max: 30 },
+  { key: 'points_best_goalkeeper', label: 'Mejor Arquero', description: 'Acierta el mejor portero del torneo', type: 'points', min: 0, max: 30 },
+  { key: 'points_best_player', label: 'Mejor Jugador (Balón de Oro)', description: 'Acierta el jugador más destacado', type: 'points', min: 0, max: 30 },
 ]
 
 const FEATURE_ITEMS: ConfigItem[] = [
@@ -45,6 +47,8 @@ const FEATURE_ITEMS: ConfigItem[] = [
   { key: 'feature_group_predictions', label: 'Pronósticos de Grupos', description: 'Permitir predecir clasificados por grupo', type: 'toggle' },
   { key: 'feature_special_predictions', label: 'Predicciones Especiales', description: 'Permitir campeón, finalista, etc.', type: 'toggle' },
   { key: 'feature_top_scorer', label: 'Goleador del Torneo', description: 'Incluir predicción de máximo goleador', type: 'toggle' },
+  { key: 'feature_best_goalkeeper', label: 'Mejor Arquero', description: 'Incluir predicción de mejor portero', type: 'toggle' },
+  { key: 'feature_best_player', label: 'Mejor Jugador', description: 'Incluir predicción de mejor jugador (Balón de Oro)', type: 'toggle' },
 ]
 
 const LOCK_ITEMS: ConfigItem[] = [

@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { isPollaOpen } from '@/lib/polla'
 
-const VALID_TYPES = ['champion', 'finalist', 'third', 'top_scorer']
+const VALID_TYPES = ['champion', 'finalist', 'third', 'top_scorer', 'best_goalkeeper', 'best_player']
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
