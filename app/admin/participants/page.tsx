@@ -7,6 +7,7 @@ export const revalidate = 0
 
 export default async function ParticipantsPage() {
   const allUsers = await db.select().from(users).where(eq(users.role, 'participant'))
+  const allAdmins = await db.select().from(users).where(eq(users.role, 'admin'))
 
   const pts = await db
     .select({
@@ -37,7 +38,7 @@ export default async function ParticipantsPage() {
           Gestiona participantes y genera sus QR de acceso
         </p>
       </div>
-      <ParticipantsManager initialParticipants={participants} />
+      <ParticipantsManager initialParticipants={participants} initialAdmins={allAdmins} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { users, predictions, groupPredictions, specialPredictions } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, or, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 
 export type LeaderboardEntry = {
@@ -50,8 +50,13 @@ export async function GET() {
     .from(specialPredictions)
     .groupBy(specialPredictions.userId)
 
-  // All participants (not admin)
-  const allUsers = await db.select().from(users).where(eq(users.role, 'participant'))
+  // Participants + admins approved as participants
+  const allUsers = await db.select().from(users).where(
+    or(
+      eq(users.role, 'participant'),
+      and(eq(users.role, 'admin'), eq(users.inscriptionStatus, 'approved'))
+    )
+  )
 
   const matchMap = Object.fromEntries(matchPts.map(r => [r.userId, r]))
   const groupMap = Object.fromEntries(groupPts.map(r => [r.userId, r]))
