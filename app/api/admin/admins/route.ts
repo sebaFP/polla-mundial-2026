@@ -46,17 +46,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error creando administrador' }, { status: 500 })
   }
 
-  const [created] = await db.insert(users).values({
-    id: authData.user.id,
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    role: 'admin',
-  }).returning({
-    id: users.id,
-    name: users.name,
-    email: users.email,
-    createdAt: users.createdAt,
-  })
+  let created
+  try {
+    ;[created] = await db.insert(users).values({
+      id: authData.user.id,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      role: 'admin',
+    }).returning({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      createdAt: users.createdAt,
+    })
+  } catch (err) {
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    console.error('DB insert failed, auth user rolled back:', err)
+    return NextResponse.json({ error: 'Error creando administrador' }, { status: 500 })
+  }
 
   return NextResponse.json(created, { status: 201 })
 }
@@ -69,7 +76,14 @@ export async function DELETE(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
   if (userId === session.userId) return NextResponse.json({ error: 'No puedes eliminarte a ti mismo' }, { status: 400 })
 
-  await supabaseAdmin.auth.admin.deleteUser(userId)
+  const target = await db.select({ id: users.id }).from(users)
+    .where(and(eq(users.id, userId), eq(users.role, 'admin')))
+    .limit(1)
+  if (target.length === 0) return NextResponse.json({ error: 'Administrador no encontrado' }, { status: 404 })
+
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (deleteError) return NextResponse.json({ error: 'Error eliminando usuario' }, { status: 500 })
+
   await db.delete(users).where(and(eq(users.id, userId), eq(users.role, 'admin')))
   return NextResponse.json({ ok: true })
 }

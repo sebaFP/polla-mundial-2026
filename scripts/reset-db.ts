@@ -44,6 +44,8 @@ async function main() {
 
   console.log('💣 Resetting database...')
 
+  await deleteAllAuthUsers()
+
   // Drop all app tables in dependency order
   await db.execute(sql`
     DROP TABLE IF EXISTS
@@ -58,8 +60,6 @@ async function main() {
     CASCADE
   `)
   console.log('✅ All tables dropped')
-
-  await deleteAllAuthUsers()
 
   await client.end()
   console.log('')
