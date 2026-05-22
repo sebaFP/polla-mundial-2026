@@ -42,6 +42,9 @@
   --color-gold: var(--gold);
   --color-gold-dark: var(--gold-dark);
   --color-green-fifa: var(--green-fifa);
+  --color-fifa-red: var(--fifa-red);
+  --color-fifa-blue: var(--fifa-blue);
+  --color-fifa-green: var(--fifa-green);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -76,7 +79,7 @@
   --chart-3: oklch(0.65 0.15 200);
   --chart-4: oklch(0.70 0.13 50);
   --chart-5: oklch(0.55 0.18 300);
-  --radius: 0.75rem;
+  --radius: 1rem;
   --sidebar: oklch(0.08 0.022 250);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.78 0.17 85);
@@ -89,6 +92,10 @@
   --gold: oklch(0.78 0.17 85);
   --gold-dark: oklch(0.65 0.15 80);
   --green-fifa: oklch(0.48 0.14 155);
+  /* FIFA 2026 tri-national */
+  --fifa-red: oklch(0.55 0.22 22);
+  --fifa-blue: oklch(0.32 0.13 262);
+  --fifa-green: oklch(0.62 0.17 145);
 }
 
 /* Dark mode mirrors root (app is always dark) */
@@ -143,9 +150,36 @@
   background-clip: text;
 }
 
-/* Animated gradient bg for hero */
+/* FIFA 2026 tri-color gradient text */
+.text-gradient-fifa {
+  background: linear-gradient(135deg, #E61D25 0%, #2A398D 50%, #3CAC3B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* FIFA tri-color decorative stripe (Canada red / USA blue / Mexico green) */
+.fifa-stripe {
+  background: linear-gradient(to right, #E61D25 33.33%, #2A398D 33.33% 66.66%, #3CAC3B 66.66%);
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Animated gradient bg for hero — with subtle FIFA tri-color radials */
 .gradient-bg {
-  background: radial-gradient(ellipse at top, oklch(0.14 0.04 250) 0%, oklch(0.06 0.025 250) 60%);
+  background:
+    radial-gradient(ellipse at 20% 0%, oklch(0.55 0.22 22 / 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 0%, oklch(0.32 0.13 262 / 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, oklch(0.62 0.17 145 / 0.06) 0%, transparent 50%),
+    oklch(0.06 0.025 250);
+}
+
+/* Geometric pattern background — nested rounded rectangles inspired by FIFA 2026 "26" motif */
+.pattern-geo {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect x='6' y='6' width='68' height='68' rx='18' fill='none' stroke='white' stroke-width='1.5'/%3E%3Crect x='18' y='18' width='44' height='44' rx='11' fill='none' stroke='white' stroke-width='1'/%3E%3Crect x='30' y='30' width='20' height='20' rx='5' fill='none' stroke='white' stroke-width='0.75'/%3E%3C/svg%3E");
+  background-size: 80px 80px;
+  opacity: 0.035;
+  pointer-events: none;
 }
 
 /* Live pulse animation */
@@ -159,7 +193,7 @@
 
 /* Score input styling */
 .score-input {
-  @apply w-14 h-14 text-center text-2xl font-mono font-bold rounded-lg border-2 border-border bg-input text-foreground focus:border-primary focus:outline-none transition-colors;
+  @apply w-14 h-14 text-center text-2xl font-mono font-bold rounded-xl border-2 border-border bg-input text-foreground focus:border-primary focus:outline-none transition-colors;
 }
 
 /* Scrollbar styling */
