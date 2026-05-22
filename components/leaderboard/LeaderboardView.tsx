@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { LeaderboardEntry } from '@/app/api/leaderboard/route'
+import { LeaderboardEntry } from '@/app/api/pollas/[pollaId]/leaderboard/route'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +78,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
 
 type Props = {
   currentUserId: string
+  pollaId: string
   prizePoolEnabled: boolean
   totalPool: number
   currency: string
@@ -90,13 +91,13 @@ function formatAmount(n: number, currency: string) {
   return `${currency} ${n.toLocaleString('es-CL')}`
 }
 
-export default function LeaderboardView({ currentUserId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
+export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   async function fetchLeaderboard() {
     try {
-      const res = await fetch('/api/leaderboard', { cache: 'no-store' })
+      const res = await fetch(`/api/pollas/${pollaId}/leaderboard`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setEntries(data)

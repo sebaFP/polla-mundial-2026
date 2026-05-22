@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,14 +21,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
     }
 
-    const role = data.user.app_metadata?.role ?? 'participant'
-    if (role !== 'admin') {
-      await supabase.auth.signOut()
-      return NextResponse.json({ error: 'Acceso solo para administradores' }, { status: 403 })
-    }
+    const [dbUser] = await db.select({ isSuperAdmin: users.isSuperAdmin })
+      .from(users).where(eq(users.id, data.user.id))
 
-    const redirect = '/admin'
-    return NextResponse.json({ ok: true, role, name: data.user.user_metadata?.name ?? '', redirect })
+    const name = data.user.user_metadata?.name ?? ''
+    return NextResponse.json({
+      ok: true,
+      name,
+      isSuperAdmin: dbUser?.isSuperAdmin ?? false,
+      redirect: '/',
+    })
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

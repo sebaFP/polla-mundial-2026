@@ -14,6 +14,7 @@ type Props = {
   matches: Match[]
   initialPredictions: Prediction[]
   userId: string
+  pollaId: string
 }
 
 type PredictionMap = Record<number, { s1: number; s2: number; saved: boolean; points?: number | null }>
@@ -34,7 +35,7 @@ function getStatusBadge(match: Match, locked: boolean) {
   return null
 }
 
-export default function MatchPredictions({ matches, initialPredictions, userId }: Props) {
+export default function MatchPredictions({ matches, initialPredictions, userId, pollaId }: Props) {
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [selectedGroup, setSelectedGroup] = useState<string>('Group A')
   const [preds, setPreds] = useState<PredictionMap>(() => {
@@ -70,7 +71,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId }
     if (!pred) return
     setSaving(matchId)
     try {
-      const res = await fetch('/api/predictions', {
+      const res = await fetch(`/api/pollas/${pollaId}/predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ matchId, predictedScore1: pred.s1, predictedScore2: pred.s2 }),

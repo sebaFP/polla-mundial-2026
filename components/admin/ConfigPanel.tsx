@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-type Props = { initialConfig: Record<string, string> }
+type Props = { initialConfig: Record<string, string>; pollaId?: string }
 
 type ConfigItem = {
   key: string
@@ -91,7 +91,7 @@ function formatAmount(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString('es-CL')}`
 }
 
-export default function ConfigPanel({ initialConfig }: Props) {
+export default function ConfigPanel({ initialConfig, pollaId }: Props) {
   const [config, setConfig] = useState(initialConfig)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -106,7 +106,8 @@ export default function ConfigPanel({ initialConfig }: Props) {
   async function saveConfig() {
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/config', {
+      const endpoint = pollaId ? `/api/pollas/${pollaId}/config` : '/api/admin/config'
+      const res = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),

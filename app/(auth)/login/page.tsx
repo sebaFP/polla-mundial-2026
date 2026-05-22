@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -29,7 +30,7 @@ export default function LoginPage() {
         return
       }
       toast.success(`Bienvenido, ${data.name}`)
-      router.push(data.redirect ?? (data.role === 'admin' ? '/admin' : '/predictions'))
+      router.push(data.redirect ?? '/')
     } catch {
       toast.error('Error de conexión')
     } finally {
@@ -117,7 +118,11 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
-          ¿Sin contraseña aún? Escanea el QR que te enviaron
+          ¿Sin cuenta?{' '}
+          <Link href="/register" className="text-primary hover:underline font-medium">
+            Regístrate
+          </Link>
+          {' '}o escanea el QR que te enviaron
         </p>
       </div>
     </div>

@@ -13,6 +13,7 @@ type Props = {
   initialPredictions: GroupPrediction[]
   matches: Match[]
   standings: GroupStanding[]
+  pollaId: string
 }
 
 function isGroupLocked(groupName: string, matches: Match[]): boolean {
@@ -22,7 +23,7 @@ function isGroupLocked(groupName: string, matches: Match[]): boolean {
   return first.lockTime ? new Date() >= new Date(first.lockTime) : false
 }
 
-export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings }: Props) {
+export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings, pollaId }: Props) {
   const [preds, setPreds] = useState<Record<string, { first: string; second: string; saved: boolean }>>(() => {
     const map: Record<string, { first: string; second: string; saved: boolean }> = {}
     for (const p of initialPredictions) {
@@ -40,7 +41,7 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
     if (pred.first === pred.second) { toast.error('Deben ser equipos diferentes'); return }
     setSaving(groupName)
     try {
-      const res = await fetch('/api/group-predictions', {
+      const res = await fetch(`/api/pollas/${pollaId}/group-predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupName, firstPlace: pred.first, secondPlace: pred.second }),

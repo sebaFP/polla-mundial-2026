@@ -1,17 +1,13 @@
 import { db } from '@/lib/db'
-import { matches, predictions, groupStandings, groupPredictions, tournamentConfig } from '@/lib/db/schema'
-import { eq, and, sql } from 'drizzle-orm'
+import { matches, predictions, groupStandings, groupPredictions, pollaMembers } from '@/lib/db/schema'
+import { eq, and, sql, inArray } from 'drizzle-orm'
 import { getActiveWCMatches, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
+import { getPollaConfig } from '@/lib/polla'
 
 export type SyncResult = {
   updated: number
   errors: string[]
-}
-
-async function getConfig(): Promise<Record<string, string>> {
-  const rows = await db.select().from(tournamentConfig)
-  return Object.fromEntries(rows.map(r => [r.key, r.value]))
 }
 
 async function updateGroupStandings(groupName: string, team1: string, team2: string, score1: number, score2: number) {
@@ -62,9 +58,18 @@ async function updateGroupStandings(groupName: string, team1: string, team2: str
   ])
 }
 
-async function recalcMatchPredictions(matchId: number, score1: number, score2: number, config: Record<string, string>) {
+async function recalcMatchPredictions(matchId: number, score1: number, score2: number) {
   const preds = await db.select().from(predictions).where(eq(predictions.matchId, matchId))
+
+  // Get unique pollaIds for these predictions
+  const pollaIds = [...new Set(preds.map(p => p.pollaId).filter(Boolean) as string[])]
+  const configCache: Record<string, Record<string, string>> = {}
+  for (const pid of pollaIds) {
+    configCache[pid] = await getPollaConfig(pid)
+  }
+
   for (const pred of preds) {
+    const config = pred.pollaId ? (configCache[pred.pollaId] ?? {}) : {}
     const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config)
     await db.update(predictions)
       .set({ points: pts, updatedAt: new Date() })
@@ -72,7 +77,7 @@ async function recalcMatchPredictions(matchId: number, score1: number, score2: n
   }
 }
 
-async function recalcGroupPredictions(groupName: string, config: Record<string, string>) {
+async function recalcGroupPredictions(groupName: string) {
   const standings = await db.select().from(groupStandings)
     .where(eq(groupStandings.groupName, groupName))
 
@@ -90,7 +95,14 @@ async function recalcGroupPredictions(groupName: string, config: Record<string, 
   const groupPreds = await db.select().from(groupPredictions)
     .where(eq(groupPredictions.groupName, groupName))
 
+  const pollaIds = [...new Set(groupPreds.map(p => p.pollaId).filter(Boolean) as string[])]
+  const configCache: Record<string, Record<string, string>> = {}
+  for (const pid of pollaIds) {
+    configCache[pid] = await getPollaConfig(pid)
+  }
+
   for (const gp of groupPreds) {
+    const config = gp.pollaId ? (configCache[gp.pollaId] ?? {}) : {}
     const { pointsFirst, pointsSecond } = calcGroupPoints(
       gp.firstPlace, gp.secondPlace, actualFirst, actualSecond, config
     )
@@ -104,7 +116,6 @@ export async function syncResults(): Promise<SyncResult> {
   const result: SyncResult = { updated: 0, errors: [] }
 
   try {
-    const config = await getConfig()
     const fdMatches = await getActiveWCMatches()
 
     for (const fdm of fdMatches) {
@@ -139,11 +150,11 @@ export async function syncResults(): Promise<SyncResult> {
           .where(eq(matches.id, match.id))
 
         if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
-          await recalcMatchPredictions(match.id, newScore1, newScore2, config)
+          await recalcMatchPredictions(match.id, newScore1, newScore2)
 
           if (match.stage === 'GROUP_STAGE' && match.groupName) {
             await updateGroupStandings(match.groupName, match.team1, match.team2, newScore1, newScore2)
-            await recalcGroupPredictions(match.groupName, config)
+            await recalcGroupPredictions(match.groupName)
           }
         }
 

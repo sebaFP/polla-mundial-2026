@@ -8,6 +8,7 @@ export async function proxy(req: NextRequest) {
   if (
     pathname.startsWith('/join/') ||
     pathname === '/login' ||
+    pathname === '/register' ||
     pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/api/cron/') ||
     pathname.startsWith('/_next/') ||
@@ -46,16 +47,9 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  const role = user.app_metadata?.role as string | undefined
-
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin/')) {
-    if (role !== 'admin') {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      return NextResponse.redirect(new URL('/predictions', req.url))
-    }
-  }
+  // Superadmin routes — DB check happens in route handlers, middleware only ensures auth
+  // Polla admin routes — admin check happens in route handlers
+  // All other authenticated routes just need a valid session
 
   return response
 }

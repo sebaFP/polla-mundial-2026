@@ -14,6 +14,7 @@ type Props = {
   initialSpecials: SpecialPrediction[]
   config: Record<string, string>
   isLocked: boolean
+  pollaId: string
 }
 
 const TEAM_TYPES = [
@@ -28,7 +29,7 @@ const PLAYER_TYPES = [
   { type: 'best_player', label: '⭐ Mejor Jugador', configKey: 'points_best_player', featureKey: 'feature_best_player', description: 'Jugador más destacado del torneo (Balón de Oro)' },
 ]
 
-export default function SpecialPredictionsForm({ teams, initialSpecials, config, isLocked }: Props) {
+export default function SpecialPredictionsForm({ teams, initialSpecials, config, isLocked, pollaId }: Props) {
   const [teamPreds, setTeamPreds] = useState<Record<string, { team: string; saved: boolean; points?: number | null }>>(() => {
     const map: Record<string, { team: string; saved: boolean; points?: number | null }> = {}
     for (const s of initialSpecials) {
@@ -55,7 +56,7 @@ export default function SpecialPredictionsForm({ teams, initialSpecials, config,
     if (!pred?.team) { toast.error('Selecciona un equipo'); return }
     setSaving(type)
     try {
-      const res = await fetch('/api/special-predictions', {
+      const res = await fetch(`/api/pollas/${pollaId}/special-predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, teamName: pred.team }),
@@ -76,7 +77,7 @@ export default function SpecialPredictionsForm({ teams, initialSpecials, config,
     if (!pred?.player?.trim()) { toast.error('Ingresa un nombre de jugador'); return }
     setSaving(type)
     try {
-      const res = await fetch('/api/special-predictions', {
+      const res = await fetch(`/api/pollas/${pollaId}/special-predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, playerName: pred.player.trim() }),

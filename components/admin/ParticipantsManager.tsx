@@ -13,7 +13,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
 
-type Participant = User & { totalPoints: number; predictedMatches: number; qrToken: string | null }
+type Participant = Omit<User, 'inscriptionStatus' | 'inscriptionNotes'> & {
+  totalPoints: number
+  predictedMatches: number
+  qrToken: string | null
+  inscriptionStatus?: string | null
+  inscriptionNotes?: string | null
+}
 
 type InscriptionStatus = 'pending' | 'confirmed' | 'approved' | 'rejected'
 
@@ -365,7 +371,7 @@ export default function ParticipantsManager({
           <p className="text-sm font-semibold text-muted-foreground">Administradores en el pool</p>
           <p className="text-xs text-muted-foreground">Los admins habilitados aparecen en el leaderboard y pueden hacer pronósticos.</p>
           {admins.map(a => {
-            const isParticipant = a.inscriptionStatus === 'approved'
+            const isParticipant = (a as { inscriptionStatus?: string | null }).inscriptionStatus === 'approved'
             return (
               <Card key={a.id} className="glass-card p-3">
                 <div className="flex items-center gap-3">
@@ -389,7 +395,7 @@ export default function ParticipantsManager({
                     variant={isParticipant ? 'outline' : 'default'}
                     className="text-xs shrink-0"
                     disabled={togglingAdmin === a.id}
-                    onClick={() => toggleAdminParticipation(a.id, a.inscriptionStatus)}
+                    onClick={() => toggleAdminParticipation(a.id, (a as { inscriptionStatus?: string | null }).inscriptionStatus ?? null)}
                   >
                     {togglingAdmin === a.id ? '...' : isParticipant ? 'Deshabilitar' : 'Habilitar'}
                   </Button>

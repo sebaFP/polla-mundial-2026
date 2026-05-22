@@ -1,9 +1,13 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export type SessionPayload = {
   userId: string
-  role: 'admin' | 'participant'
   name: string
+  email: string
+  isSuperAdmin: boolean
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
@@ -12,9 +16,13 @@ export async function getSession(): Promise<SessionPayload | null> {
 
   if (error || !user) return null
 
+  const [dbUser] = await db.select({ isSuperAdmin: users.isSuperAdmin })
+    .from(users).where(eq(users.id, user.id))
+
   return {
     userId: user.id,
-    role: (user.app_metadata?.role ?? 'participant') as 'admin' | 'participant',
     name: (user.user_metadata?.name ?? '') as string,
+    email: user.email ?? '',
+    isSuperAdmin: dbUser?.isSuperAdmin ?? false,
   }
 }

@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-type Props = { initialMatches: Match[] }
+type Props = { initialMatches: Match[]; pollaId?: string }
 
 function StatusBadge({ status }: { status: string | null }) {
   if (status === 'FINISHED') return <Badge className="bg-green-900/50 text-green-300 border-green-700 text-xs">FIN</Badge>
@@ -19,7 +19,7 @@ function StatusBadge({ status }: { status: string | null }) {
   return <Badge variant="outline" className="text-xs">PROG</Badge>
 }
 
-export default function ResultsManager({ initialMatches }: Props) {
+export default function ResultsManager({ initialMatches, pollaId }: Props) {
   const [matches, setMatches] = useState(initialMatches)
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [scores, setScores] = useState<Record<number, { s1: string; s2: string }>>({})
@@ -69,7 +69,10 @@ export default function ResultsManager({ initialMatches }: Props) {
 
     setSaving(matchId)
     try {
-      const res = await fetch(`/api/admin/results/${matchId}`, {
+      const endpoint = pollaId
+        ? `/api/pollas/${pollaId}/results/${matchId}`
+        : `/api/admin/results/${matchId}`
+      const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score1: s1, score2: s2 }),

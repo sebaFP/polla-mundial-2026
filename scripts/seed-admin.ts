@@ -1,8 +1,8 @@
 /**
- * Creates the first admin user in Supabase Auth + app users table.
+ * Creates the first superadmin user in Supabase Auth + app users table.
  * Run: pnpm seed:admin
  *
- * Reads ADMIN_EMAIL and ADMIN_PASSWORD from .env (only needed for this script).
+ * Reads ADMIN_EMAIL and ADMIN_PASSWORD from .env.
  */
 import 'dotenv/config'
 import { drizzle } from 'drizzle-orm/postgres-js'
@@ -30,14 +30,13 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`👤 Creating admin: ${email}`)
+  console.log(`👤 Creating superadmin: ${email}`)
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email: email.trim().toLowerCase(),
     password,
     email_confirm: true,
     user_metadata: { name },
-    app_metadata: { role: 'admin' },
   })
 
   if (error) {
@@ -52,12 +51,12 @@ async function main() {
     id: data.user.id,
     name,
     email: email.trim().toLowerCase(),
-    role: 'admin',
+    isSuperAdmin: true,
   }).onConflictDoNothing()
 
   await client.end()
-  console.log(`✅ Admin created: ${name} <${email}>`)
-  console.log('   Login at /login with the credentials from .env')
+  console.log(`✅ Superadmin created: ${name} <${email}>`)
+  console.log('   Login at /login — then create your polla at /polla/create')
 }
 
 main().catch(err => {
