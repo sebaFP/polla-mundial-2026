@@ -123,6 +123,16 @@ export default function ConfigPanel({ initialConfig }: Props) {
   const pct3 = parseInt(config.prize_3_pct ?? '10') || 0
   const pctTotal = pct1 + pct2 + pct3
 
+  const adminFeeEnabled = config.admin_fee_enabled === 'true'
+  const adminFeeType = config.admin_fee_type ?? 'percentage'
+  const adminFeeValue = parseFloat(config.admin_fee_value ?? '0') || 0
+
+  function calcAdminFee(gross: number) {
+    if (!adminFeeEnabled || adminFeeValue <= 0) return 0
+    if (adminFeeType === 'percentage') return Math.round(gross * adminFeeValue / 100)
+    return adminFeeValue
+  }
+
   return (
     <div className="space-y-6">
       {dirty && (
@@ -327,11 +337,90 @@ export default function ConfigPanel({ initialConfig }: Props) {
       {/* Tab: Premios */}
       {activeTab === 'prizes' && (
         <div className="space-y-4">
+          {/* Admin fee */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-sm">💼 Comisión del Organizador</CardTitle>
+              <CardDescription className="text-xs">
+                Monto que queda para los administradores antes de distribuir el pozo
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Habilitar Comisión</Label>
+                  <p className="text-xs text-muted-foreground">Descuenta del total recaudado antes de calcular premios</p>
+                </div>
+                <Switch
+                  checked={adminFeeEnabled}
+                  onCheckedChange={v => update('admin_fee_enabled', v)}
+                />
+              </div>
+
+              {adminFeeEnabled && (
+                <div className="space-y-4 pt-1">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => update('admin_fee_type', 'percentage')}
+                      className={cn(
+                        'flex-1 py-2 text-sm rounded-md border transition-colors',
+                        adminFeeType === 'percentage'
+                          ? 'border-primary bg-primary/10 text-primary font-medium'
+                          : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent'
+                      )}
+                    >
+                      Porcentaje (%)
+                    </button>
+                    <button
+                      onClick={() => update('admin_fee_type', 'amount')}
+                      className={cn(
+                        'flex-1 py-2 text-sm rounded-md border transition-colors',
+                        adminFeeType === 'amount'
+                          ? 'border-primary bg-primary/10 text-primary font-medium'
+                          : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent'
+                      )}
+                    >
+                      Monto fijo
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      {adminFeeType === 'percentage' ? '% del total recaudado' : `Monto fijo (${config.inscription_currency ?? 'CLP'})`}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={adminFeeType === 'percentage' ? 100 : undefined}
+                        step={adminFeeType === 'percentage' ? 1 : 100}
+                        value={config.admin_fee_value ?? '0'}
+                        onChange={e => update('admin_fee_value', e.target.value)}
+                        className="max-w-36"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {adminFeeType === 'percentage' ? '%' : config.inscription_currency ?? 'CLP'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {adminFeeType === 'percentage'
+                        ? 'Se descuenta del total recaudado. El resto va al pozo de premios.'
+                        : 'Monto fijo total para los administradores. El resto va al pozo de premios.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Prize distribution */}
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="text-sm">🏆 Distribución de Premios</CardTitle>
               <CardDescription className="text-xs">
-                El pozo se calcula automáticamente: participantes aprobados × cuota de inscripción
+                {adminFeeEnabled && adminFeeValue > 0
+                  ? 'Los porcentajes se aplican al pozo neto (después de descontar la comisión)'
+                  : 'El pozo se calcula automáticamente: participantes aprobados × cuota de inscripción'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -379,31 +468,51 @@ export default function ConfigPanel({ initialConfig }: Props) {
               </div>
 
               {/* Preview */}
-              {fee > 0 && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Vista previa (ejemplo con 10 aprobados)</p>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gradient-gold">
-                      {formatAmount(fee * 10, config.inscription_currency ?? 'CLP')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Pozo estimado</p>
+              {fee > 0 && (() => {
+                const gross = fee * 10
+                const adminCut = calcAdminFee(gross)
+                const netPool = Math.max(0, gross - adminCut)
+                const currency = config.inscription_currency ?? 'CLP'
+                return (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Vista previa (ejemplo con 10 aprobados)</p>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Total recaudado</span>
+                        <span className="text-sm font-semibold font-mono">{formatAmount(gross, currency)}</span>
+                      </div>
+                      {adminFeeEnabled && adminCut > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">
+                            Comisión organizador ({adminFeeType === 'percentage' ? `${adminFeeValue}%` : 'fija'})
+                          </span>
+                          <span className="text-sm font-semibold font-mono text-muted-foreground">− {formatAmount(adminCut, currency)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center border-t border-border pt-1.5">
+                        <span className="text-xs font-medium">Pozo neto</span>
+                        <span className="text-xl font-bold text-gradient-gold">{formatAmount(netPool, currency)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                      <div>
+                        <p className="text-lg font-bold text-amber-400">{formatAmount(Math.round(netPool * pct1 / 100), currency)}</p>
+                        <p className="text-xs text-muted-foreground">🥇 1°</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-slate-300">{formatAmount(Math.round(netPool * pct2 / 100), currency)}</p>
+                        <p className="text-xs text-muted-foreground">🥈 2°</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-orange-400">{formatAmount(Math.round(netPool * pct3 / 100), currency)}</p>
+                        <p className="text-xs text-muted-foreground">🥉 3°</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <p className="text-lg font-bold text-amber-400">{formatAmount(Math.round(fee * 10 * pct1 / 100), config.inscription_currency ?? 'CLP')}</p>
-                      <p className="text-xs text-muted-foreground">🥇 1°</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-slate-300">{formatAmount(Math.round(fee * 10 * pct2 / 100), config.inscription_currency ?? 'CLP')}</p>
-                      <p className="text-xs text-muted-foreground">🥈 2°</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-orange-400">{formatAmount(Math.round(fee * 10 * pct3 / 100), config.inscription_currency ?? 'CLP')}</p>
-                      <p className="text-xs text-muted-foreground">🥉 3°</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                )
+              })()}
             </CardContent>
           </Card>
         </div>

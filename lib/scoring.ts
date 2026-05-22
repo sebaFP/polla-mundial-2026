@@ -71,4 +71,7 @@ export const DEFAULT_CONFIG: Config = {
   prize_1_pct: '60',
   prize_2_pct: '30',
   prize_3_pct: '10',
+  admin_fee_enabled: 'false',
+  admin_fee_type: 'percentage',
+  admin_fee_value: '0',
 }
