@@ -3,37 +3,48 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { createToken, setSessionCookie } from '@/lib/auth/session'
+import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 })
+    }
 
-    if (
-      email !== process.env.ADMIN_EMAIL ||
-      password !== process.env.ADMIN_PASSWORD
-    ) {
+    const found = await db.select().from(users)
+      .where(eq(users.email, email.trim().toLowerCase()))
+      .limit(1)
+
+    if (found.length === 0) {
       return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
     }
 
-    // Find or create admin user
-    let adminUser = await db.select().from(users).where(eq(users.email, email)).limit(1)
-    if (adminUser.length === 0) {
-      const created = await db.insert(users).values({
-        name: 'Administrador',
-        email,
-        role: 'admin',
-      }).returning()
-      adminUser = created
+    const user = found[0]
+
+    if (user.passwordHash) {
+      const valid = await bcrypt.compare(password, user.passwordHash)
+      if (!valid) return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
+    } else if (user.role === 'admin') {
+      // Bootstrap fallback: env-var password for first admin login
+      if (email.trim().toLowerCase() !== process.env.ADMIN_EMAIL?.toLowerCase() || password !== process.env.ADMIN_PASSWORD) {
+        return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
+      }
+    } else {
+      // Participant without password set — must use QR
+      return NextResponse.json({ error: 'Debes iniciar sesión con tu código QR' }, { status: 401 })
     }
 
     const token = await createToken({
-      userId: adminUser[0].id,
-      role: 'admin',
-      name: adminUser[0].name,
+      userId: user.id,
+      role: user.role as 'admin' | 'participant',
+      name: user.name,
     })
 
     await setSessionCookie(token)
-    return NextResponse.json({ ok: true, role: 'admin' })
+
+    const redirect = user.role === 'admin' ? '/admin' : '/predictions'
+    return NextResponse.json({ ok: true, role: user.role, name: user.name, redirect })
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

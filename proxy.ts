@@ -19,6 +19,9 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // /set-password requires session but is outside participant layout
+  // handled below — just needs valid token, no role check
+
   const token = req.cookies.get(COOKIE_NAME)?.value
 
   if (!token) {

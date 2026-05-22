@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 const links = [
   { href: '/predictions', label: 'Pronósticos' },
   { href: '/leaderboard', label: 'Tabla' },
+  { href: '/account', label: '🔑 Cuenta' },
 ]
 
 export default function ParticipantNav({ userName, role }: { userName: string; role: string }) {

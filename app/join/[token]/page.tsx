@@ -21,5 +21,11 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   })
 
   await setSessionCookie(jwt)
+
+  // First QR login: no password set yet → prompt to create one
+  if (!user.passwordHash) {
+    redirect('/set-password')
+  }
+
   redirect('/predictions')
 }

@@ -28,8 +28,8 @@ export default function LoginPage() {
         toast.error(data.error ?? 'Error al iniciar sesión')
         return
       }
-      toast.success('Bienvenido, Admin')
-      router.push('/admin')
+      toast.success(`Bienvenido, ${data.name}`)
+      router.push(data.redirect ?? (data.role === 'admin' ? '/admin' : '/predictions'))
     } catch {
       toast.error('Error de conexión')
     } finally {
@@ -40,7 +40,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
-        {/* Logo */}
         <div className="text-center space-y-2">
           <div className="text-6xl">🏆</div>
           <h1 className="text-3xl font-bold text-gradient-gold">Polla Mundial</h1>
@@ -49,8 +48,8 @@ export default function LoginPage() {
 
         <Card className="glass-card border-border">
           <CardHeader>
-            <CardTitle className="text-xl">Panel de Administración</CardTitle>
-            <CardDescription>Ingresa con tus credenciales de admin</CardDescription>
+            <CardTitle className="text-xl">Iniciar sesión</CardTitle>
+            <CardDescription>Admin o participante con contraseña</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -59,7 +58,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@ejemplo.com"
+                  placeholder="tu@email.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
@@ -86,7 +85,7 @@ export default function LoginPage() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
-          ¿Eres participante? Escanea el QR que te enviaron
+          ¿Sin contraseña aún? Escanea el QR que te enviaron
         </p>
       </div>
     </div>

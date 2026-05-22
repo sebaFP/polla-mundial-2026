@@ -10,7 +10,8 @@ const links = [
   { href: '/admin', label: '📊 Dashboard', exact: true },
   { href: '/admin/participants', label: '👥 Participantes' },
   { href: '/admin/results', label: '⚽ Resultados' },
-  { href: '/admin/config', label: '⚙️ Configuración' },
+  { href: '/admin/config', label: '⚙️ Config' },
+  { href: '/admin/admins', label: '🔐 Admins' },
 ]
 
 export default function AdminNav({ userName }: { userName: string }) {
