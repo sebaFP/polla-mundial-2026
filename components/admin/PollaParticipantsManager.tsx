@@ -187,8 +187,15 @@ export default function PollaParticipantsManager({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{p.name}</p>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{p.name}</p>
+                  {p.role === 'admin' && (
+                    <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20 shrink-0 font-bold">
+                      Admin
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mt-0.5">
                   {p.email && <p className="text-xs text-muted-foreground truncate">{p.email}</p>}
                   {inscriptionEnabled && (
                     <Badge className={`text-xs border ${STATUS_COLORS[(p.inscriptionStatus ?? 'pending') as InscriptionStatus]}`}>
@@ -204,20 +211,28 @@ export default function PollaParticipantsManager({
                     QR
                   </Button>
                 )}
-                {inscriptionEnabled && (
-                  <select
-                    value={p.inscriptionStatus ?? 'pending'}
-                    onChange={e => updateInscription(p.userId, e.target.value as InscriptionStatus)}
-                    className="text-xs bg-background border border-border rounded px-1 py-0.5"
-                  >
-                    {(Object.keys(STATUS_LABELS) as InscriptionStatus[]).map(s => (
-                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                    ))}
-                  </select>
+                {p.role === 'admin' ? (
+                  <span className="text-xs text-muted-foreground self-center px-2">
+                    Gestionado en Admins
+                  </span>
+                ) : (
+                  <>
+                    {inscriptionEnabled && (
+                      <select
+                        value={p.inscriptionStatus ?? 'pending'}
+                        onChange={e => updateInscription(p.userId, e.target.value as InscriptionStatus)}
+                        className="text-xs bg-background border border-border rounded px-1 py-0.5"
+                      >
+                        {(Object.keys(STATUS_LABELS) as InscriptionStatus[]).map(s => (
+                          <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                        ))}
+                      </select>
+                    )}
+                    <Button size="sm" variant="destructive" className="text-xs" onClick={() => deleteParticipant(p.userId, p.name)}>
+                      ✕
+                    </Button>
+                  </>
                 )}
-                <Button size="sm" variant="destructive" className="text-xs" onClick={() => deleteParticipant(p.userId, p.name)}>
-                  ✕
-                </Button>
               </div>
             </div>
           </Card>

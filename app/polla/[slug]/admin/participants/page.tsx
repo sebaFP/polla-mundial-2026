@@ -52,7 +52,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
   const ptsMap = Object.fromEntries(pts.map(r => [r.userId, { total: Number(r.total), predicted: Number(r.predicted) }]))
 
   const participants = membersRaw
-    .filter(m => m.role === 'participant')
+    .filter(m => m.role === 'participant' || (m.role === 'admin' && m.inscriptionStatus === 'approved'))
     .map(m => ({
       ...m,
       totalPoints: ptsMap[m.userId]?.total ?? 0,

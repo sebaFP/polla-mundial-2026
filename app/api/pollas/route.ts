@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { pollas, pollaMembers, tournamentConfig, users } from '@/lib/db/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, and, sql } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { slugify } from '@/lib/polla'
 import { DEFAULT_CONFIG } from '@/lib/scoring'
@@ -25,10 +25,15 @@ export async function GET() {
 
   const allPollas = await db.select().from(pollas).where(inArray(pollas.id, pollaIds))
 
-  // Get member counts per polla
+  // Get member counts per polla (only active participants or playing admins)
   const counts = await db.select({
     pollaId: pollaMembers.pollaId,
-  }).from(pollaMembers).where(inArray(pollaMembers.pollaId, pollaIds))
+  }).from(pollaMembers).where(
+    and(
+      inArray(pollaMembers.pollaId, pollaIds),
+      sql`(${pollaMembers.role} = 'participant' OR (${pollaMembers.role} = 'admin' AND ${pollaMembers.inscriptionStatus} = 'approved'))`
+    )
+  )
 
   const countMap: Record<string, number> = {}
   for (const c of counts) {

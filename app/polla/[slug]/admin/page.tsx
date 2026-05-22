@@ -24,7 +24,15 @@ export default async function PollaAdminPage({ params }: { params: Promise<{ slu
 
   const [{ total }, { participants }, { admins }] = await Promise.all([
     db.select({ total: sql<number>`COUNT(*)` }).from(pollaMembers).where(eq(pollaMembers.pollaId, polla.id)).then(r => r[0]),
-    db.select({ participants: sql<number>`COUNT(*)` }).from(pollaMembers).where(and(eq(pollaMembers.pollaId, polla.id), eq(pollaMembers.role, 'participant'))).then(r => r[0]),
+    db.select({ participants: sql<number>`COUNT(*)` })
+      .from(pollaMembers)
+      .where(
+        and(
+          eq(pollaMembers.pollaId, polla.id),
+          sql`(${pollaMembers.role} = 'participant' OR (${pollaMembers.role} = 'admin' AND ${pollaMembers.inscriptionStatus} = 'approved'))`
+        )
+      )
+      .then(r => r[0]),
     db.select({ admins: sql<number>`COUNT(*)` }).from(pollaMembers).where(and(eq(pollaMembers.pollaId, polla.id), eq(pollaMembers.role, 'admin'))).then(r => r[0]),
   ])
 

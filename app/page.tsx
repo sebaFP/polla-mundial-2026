@@ -2,7 +2,7 @@ import { getSession } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { pollas, pollaMembers } from '@/lib/db/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, and, sql } from 'drizzle-orm'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,12 @@ export default async function HomePage() {
     const roleMap = Object.fromEntries(memberships.map(m => [m.pollaId, m.role]))
 
     const allPollas = await db.select().from(pollas).where(inArray(pollas.id, pollaIds))
-    const counts = await db.select({ pollaId: pollaMembers.pollaId }).from(pollaMembers).where(inArray(pollaMembers.pollaId, pollaIds))
+    const counts = await db.select({ pollaId: pollaMembers.pollaId }).from(pollaMembers).where(
+      and(
+        inArray(pollaMembers.pollaId, pollaIds),
+        sql`(${pollaMembers.role} = 'participant' OR (${pollaMembers.role} = 'admin' AND ${pollaMembers.inscriptionStatus} = 'approved'))`
+      )
+    )
     const countMap: Record<string, number> = {}
     for (const c of counts) countMap[c.pollaId] = (countMap[c.pollaId] ?? 0) + 1
 
