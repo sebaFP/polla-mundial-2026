@@ -80,7 +80,12 @@ function PointsSlider({ item, value, onChange }: { item: ConfigItem; value: numb
         max={item.max ?? 20}
         step={1}
         value={[value]}
-        onValueChange={(vals) => onChange((vals as number[])[0])}
+        onValueChange={(vals) => {
+          const v = Array.isArray(vals) ? vals[0] : vals
+          if (typeof v === 'number' && !isNaN(v)) {
+            onChange(v)
+          }
+        }}
         className="cursor-pointer"
       />
     </div>
@@ -446,7 +451,18 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
                     <Label className="text-sm">🥇 1° Lugar</Label>
                     <span className="text-primary font-bold font-mono">{pct1}%</span>
                   </div>
-                  <Slider min={0} max={100} step={5} value={[pct1]} onValueChange={v => update('prize_1_pct', (v as number[])[0])} />
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={[pct1]}
+                    onValueChange={vals => {
+                      const v = Array.isArray(vals) ? vals[0] : vals
+                      if (typeof v === 'number' && !isNaN(v)) {
+                        update('prize_1_pct', v)
+                      }
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -454,7 +470,18 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
                     <Label className="text-sm">🥈 2° Lugar</Label>
                     <span className="text-primary font-bold font-mono">{pct2}%</span>
                   </div>
-                  <Slider min={0} max={100} step={5} value={[pct2]} onValueChange={v => update('prize_2_pct', (v as number[])[0])} />
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={[pct2]}
+                    onValueChange={vals => {
+                      const v = Array.isArray(vals) ? vals[0] : vals
+                      if (typeof v === 'number' && !isNaN(v)) {
+                        update('prize_2_pct', v)
+                      }
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -462,7 +489,18 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
                     <Label className="text-sm">🥉 3° Lugar</Label>
                     <span className="text-primary font-bold font-mono">{pct3}%</span>
                   </div>
-                  <Slider min={0} max={100} step={5} value={[pct3]} onValueChange={v => update('prize_3_pct', (v as number[])[0])} />
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={[pct3]}
+                    onValueChange={vals => {
+                      const v = Array.isArray(vals) ? vals[0] : vals
+                      if (typeof v === 'number' && !isNaN(v)) {
+                        update('prize_3_pct', v)
+                      }
+                    }}
+                  />
                 </div>
 
                 {pctTotal !== 100 && (

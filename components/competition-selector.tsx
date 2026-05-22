@@ -53,7 +53,7 @@ export function CompetitionSelector({ value, onChange }: Props) {
         </span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width,24rem)] p-0">
+      <PopoverContent className="w-[var(--anchor-width,24rem)] p-0">
         <Command>
           <CommandInput placeholder="Buscar torneo..." />
           <CommandList className="max-h-72">

@@ -55,6 +55,23 @@ export default function PollaAdminsManager({ pollaId, initialAdmins, currentUser
     }
   }
 
+  async function toggleParticipation(userId: string, current: string) {
+    const next = current === 'approved' ? 'pending' : 'approved'
+    try {
+      const res = await fetch(`/api/pollas/${pollaId}/members`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, inscriptionStatus: next }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Error'); return }
+      setAdmins(prev => prev.map(a => a.userId === userId ? { ...a, inscriptionStatus: next } : a))
+      toast.success(next === 'approved' ? 'Admin contabilizado como jugador' : 'Admin excluido del marcador')
+    } catch {
+      toast.error('Error')
+    }
+  }
+
   async function demote(userId: string, userName: string) {
     if (userId === currentUserId) { toast.error('No puedes quitarte el rol de admin a ti mismo'); return }
     if (!confirm(`¿Quitar rol de admin a ${userName}? Pasará a ser participante.`)) return
@@ -117,16 +134,27 @@ export default function PollaAdminsManager({ pollaId, initialAdmins, currentUser
                 </div>
                 {a.email && <p className="text-xs text-muted-foreground">{a.email}</p>}
               </div>
-              {a.userId !== currentUserId && (
+              <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant={a.inscriptionStatus === 'approved' ? 'default' : 'outline'}
                   className="text-xs"
-                  onClick={() => demote(a.userId, a.name)}
+                  onClick={() => toggleParticipation(a.userId, a.inscriptionStatus)}
+                  title={a.inscriptionStatus === 'approved' ? 'Excluir del marcador' : 'Incluir en marcador'}
                 >
-                  Quitar admin
+                  {a.inscriptionStatus === 'approved' ? 'Juega' : 'No juega'}
                 </Button>
-              )}
+                {a.userId !== currentUserId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => demote(a.userId, a.name)}
+                  >
+                    Quitar admin
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
         ))}
