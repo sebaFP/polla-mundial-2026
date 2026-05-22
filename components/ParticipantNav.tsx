@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 const links = [
   { href: '/predictions', label: 'Pronósticos' },
   { href: '/leaderboard', label: 'Tabla' },
+  { href: '/reglamento', label: 'Reglamento' },
+  { href: '/inscripcion', label: 'Inscripción' },
   { href: '/account', label: '🔑 Cuenta' },
 ]
 

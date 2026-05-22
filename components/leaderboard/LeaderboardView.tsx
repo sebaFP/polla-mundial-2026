@@ -44,7 +44,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
             <div key={entry.userId} className="flex flex-col items-center gap-2">
               <div className="text-center">
                 <Avatar
-                  className="w-13 h-13 mx-auto"
+                  className="w-12 h-12 mx-auto"
                   style={{ borderColor: colors?.border ?? entry.avatarColor ?? undefined, borderWidth: 2 }}
                 >
                   <AvatarFallback
@@ -76,7 +76,21 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   )
 }
 
-export default function LeaderboardView({ currentUserId }: { currentUserId: string }) {
+type Props = {
+  currentUserId: string
+  prizePoolEnabled: boolean
+  totalPool: number
+  currency: string
+  prize1Pct: number
+  prize2Pct: number
+  prize3Pct: number
+}
+
+function formatAmount(n: number, currency: string) {
+  return `${currency} ${n.toLocaleString('es-CL')}`
+}
+
+export default function LeaderboardView({ currentUserId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -118,7 +132,33 @@ export default function LeaderboardView({ currentUserId }: { currentUserId: stri
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {prizePoolEnabled && totalPool > 0 && (
+        <div className="rounded-2xl overflow-hidden">
+          <div className="fifa-stripe w-full" style={{ height: '3px', borderRadius: 0 }} />
+          <div className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 space-y-3 rounded-b-2xl">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-1">Pozo Total</p>
+              <p className="text-3xl font-black text-gradient-gold">{formatAmount(totalPool, currency)}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(230,29,37,0.1)', border: '1px solid rgba(230,29,37,0.3)' }}>
+                <p className="font-black text-sm" style={{ color: '#E61D25' }}>{formatAmount(Math.round(totalPool * prize1Pct / 100), currency)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">1° lugar</p>
+              </div>
+              <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(42,57,141,0.1)', border: '1px solid rgba(42,57,141,0.3)' }}>
+                <p className="font-black text-sm" style={{ color: '#2A398D' }}>{formatAmount(Math.round(totalPool * prize2Pct / 100), currency)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">2° lugar</p>
+              </div>
+              <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(60,172,59,0.1)', border: '1px solid rgba(60,172,59,0.3)' }}>
+                <p className="font-black text-sm" style={{ color: '#3CAC3B' }}>{formatAmount(Math.round(totalPool * prize3Pct / 100), currency)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">3° lugar</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Podium entries={entries} />
 
       <div className="space-y-2">

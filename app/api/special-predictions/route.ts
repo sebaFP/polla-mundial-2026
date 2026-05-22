@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { specialPredictions, matches, tournamentConfig } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
+import { isPollaOpen } from '@/lib/polla'
 
 const VALID_TYPES = ['champion', 'finalist', 'third', 'top_scorer']
 
@@ -22,6 +23,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!(await isPollaOpen())) {
+    return NextResponse.json({ error: 'La polla está cerrada temporalmente' }, { status: 403 })
+  }
 
   const { type, teamName, playerName } = await req.json()
   if (!type || !VALID_TYPES.includes(type)) {

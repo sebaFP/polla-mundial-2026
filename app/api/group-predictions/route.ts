@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { groupPredictions, matches } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
+import { isPollaOpen } from '@/lib/polla'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -20,6 +21,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!(await isPollaOpen())) {
+    return NextResponse.json({ error: 'La polla está cerrada temporalmente' }, { status: 403 })
+  }
 
   const { groupName, firstPlace, secondPlace } = await req.json()
   if (!groupName || !firstPlace || !secondPlace) {

@@ -131,6 +131,48 @@ async function main() {
       .values({ key, value })
       .onConflictDoNothing()
   }
+
+  // Seed generic reglamento (only if not already set)
+  const REGLAMENTO = `# Reglamento Polla Mundial 2026
+
+## Participación
+- Cada participante recibe un código QR de acceso personal e intransferible.
+- Solo se puede participar con el enlace o QR asignado por el organizador.
+- La inscripción debe completarse antes del inicio del torneo.
+
+## Pronósticos de Partidos
+- Se puede pronosticar el marcador exacto de cada partido hasta 15 minutos antes del inicio.
+- Una vez cerrado el plazo, no se aceptan cambios.
+- Los pronósticos son individuales y confidenciales.
+
+## Puntuación
+- **Resultado exacto:** se aciertan ambos goles exactamente → 5 puntos
+- **Diferencia de goles:** se acierta la diferencia (ej. ganar por 2) → 3 puntos
+- **Tendencia:** se acierta quién gana, pierde o si empata → 2 puntos
+- **Clasificados de grupo:** 1° lugar → 6 pts | 2° lugar → 4 pts
+- **Predicciones especiales:** Campeón → 20 pts | Finalista → 10 pts | 3° lugar → 8 pts
+
+## Pronósticos Especiales
+- Antes del inicio del torneo se pueden ingresar predicciones especiales: campeón, finalista y tercer lugar.
+- Estos pronósticos se cierran con el primer partido del torneo.
+
+## Premios
+- El pozo total se divide entre los mejores clasificados al finalizar el torneo.
+- En caso de empate en puntos, se considera mayor cantidad de resultados exactos.
+- Los premios se distribuyen al finalizar la Final (19 de julio de 2026).
+
+## Fair Play
+- Está prohibido compartir o transferir accesos.
+- El organizador se reserva el derecho de descalificar participantes por conducta irregular.
+- Las decisiones del organizador son inapelables.
+
+---
+*Reglamento sujeto a modificaciones. Última actualización: ${new Date().toLocaleDateString('es-CL')}*`
+
+  await db.insert(tournamentConfig)
+    .values({ key: 'rules_text', value: REGLAMENTO })
+    .onConflictDoNothing()
+
   console.log('✅ Config seeded')
 
   await client.end()

@@ -11,6 +11,8 @@ export const users = pgTable('users', {
   qrToken: text('qr_token').unique(),
   passwordHash: text('password_hash'),
   avatarColor: text('avatar_color'),
+  inscriptionStatus: text('inscription_status').default('pending'), // 'pending' | 'confirmed' | 'approved' | 'rejected'
+  inscriptionNotes: text('inscription_notes'),
   createdAt: timestamp('created_at').defaultNow(),
 })
 
