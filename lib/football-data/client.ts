@@ -47,11 +47,15 @@ async function fdFetch<T>(path: string, params?: Record<string, string>): Promis
   return res.json() as Promise<T>
 }
 
-export async function getWCMatches(status?: string): Promise<FDMatch[]> {
+export async function getCompetitionMatches(code: string, status?: string): Promise<FDMatch[]> {
   const params: Record<string, string> = {}
   if (status) params.status = status
-  const data = await fdFetch<FDResponse>('/competitions/WC/matches', params)
+  const data = await fdFetch<FDResponse>(`/competitions/${code}/matches`, params)
   return data.matches ?? []
+}
+
+export async function getWCMatches(status?: string): Promise<FDMatch[]> {
+  return getCompetitionMatches('WC', status)
 }
 
 export async function getWCMatchesOnDate(date: string): Promise<FDMatch[]> {
@@ -63,5 +67,5 @@ export async function getWCMatchesOnDate(date: string): Promise<FDMatch[]> {
 }
 
 export async function getActiveWCMatches(): Promise<FDMatch[]> {
-  return getWCMatches('IN_PLAY,PAUSED,FINISHED')
+  return getCompetitionMatches('WC', 'IN_PLAY,PAUSED,FINISHED')
 }

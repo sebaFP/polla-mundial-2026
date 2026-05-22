@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { name, description } = await req.json()
+  const { name, description, competitionId, competitionCode, competitionName, competitionEmblem, competitionArea } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
 
   const baseSlug = slugify(name.trim())
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
     slug,
     description: description?.trim() || null,
     createdBy: session.userId,
+    competitionId:   competitionId   ?? 2000,
+    competitionCode: competitionCode ?? 'WC',
+    competitionName: competitionName ?? 'FIFA World Cup',
+    competitionEmblem: competitionEmblem ?? null,
+    competitionArea: competitionArea ?? 'World',
   }).returning()
 
   // Add creator as admin

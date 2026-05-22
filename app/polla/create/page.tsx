@@ -9,11 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import Link from 'next/link'
+import { CompetitionSelector } from '@/components/competition-selector'
+import { COMPETITIONS, type Competition } from '@/lib/competitions'
 
 export default function CreatePollaPage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [competition, setCompetition] = useState<Competition>(COMPETITIONS[0])
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,7 +27,15 @@ export default function CreatePollaPage() {
       const res = await fetch('/api/pollas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim(),
+          competitionId:    competition.id,
+          competitionCode:  competition.code,
+          competitionName:  competition.name,
+          competitionEmblem: competition.emblem,
+          competitionArea:  competition.area,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -48,7 +59,7 @@ export default function CreatePollaPage() {
           <h1 className="text-3xl font-black tracking-tight">
             <span className="text-gradient-gold">Nueva Polla</span>
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Mundial 2026</p>
+          <p className="text-muted-foreground text-sm mt-1">{competition.name}</p>
         </div>
 
         <Card className="glass-card">
@@ -58,6 +69,10 @@ export default function CreatePollaPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Torneo *</Label>
+                <CompetitionSelector value={competition} onChange={setCompetition} />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="polla-name">Nombre de la polla *</Label>
                 <Input

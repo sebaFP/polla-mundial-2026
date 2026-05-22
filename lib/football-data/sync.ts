@@ -1,11 +1,12 @@
 import { db } from '@/lib/db'
-import { matches, predictions, groupStandings, groupPredictions, pollaMembers } from '@/lib/db/schema'
-import { eq, and, sql, inArray } from 'drizzle-orm'
-import { getActiveWCMatches, type FDMatch } from './client'
+import { matches, predictions, groupStandings, groupPredictions, pollas } from '@/lib/db/schema'
+import { eq, and, sql } from 'drizzle-orm'
+import { getCompetitionMatches, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
 import { getPollaConfig } from '@/lib/polla'
 
 export type SyncResult = {
+  seeded: number
   updated: number
   errors: string[]
 }
@@ -61,7 +62,6 @@ async function updateGroupStandings(groupName: string, team1: string, team2: str
 async function recalcMatchPredictions(matchId: number, score1: number, score2: number) {
   const preds = await db.select().from(predictions).where(eq(predictions.matchId, matchId))
 
-  // Get unique pollaIds for these predictions
   const pollaIds = [...new Set(preds.map(p => p.pollaId).filter(Boolean) as string[])]
   const configCache: Record<string, Record<string, string>> = {}
   for (const pid of pollaIds) {
@@ -112,55 +112,109 @@ async function recalcGroupPredictions(groupName: string) {
   }
 }
 
+async function syncCompetition(
+  competitionCode: string,
+  competitionId: number,
+  result: SyncResult,
+) {
+  // Fetch ALL matches for this competition (no status filter) — seeds new ones + updates existing
+  const fdMatches = await getCompetitionMatches(competitionCode)
+
+  for (const fdm of fdMatches) {
+    try {
+      const externalId = String(fdm.id)
+      const lockTime = new Date(new Date(fdm.utcDate).getTime() - 15 * 60 * 1000)
+
+      const newScore1 = fdm.score.fullTime.home
+      const newScore2 = fdm.score.fullTime.away
+      const newStatus = fdm.status
+
+      // Upsert: insert if new, update scores/status if existing
+      const [upserted] = await db.insert(matches).values({
+        externalId,
+        competitionId,
+        stage:         fdm.stage,
+        groupName:     fdm.group ?? null,
+        matchday:      fdm.matchday ?? null,
+        matchDatetime: new Date(fdm.utcDate),
+        team1:         fdm.homeTeam.name,
+        team2:         fdm.awayTeam.name,
+        team1Resolved: true,
+        team2Resolved: true,
+        venue:         fdm.venue ?? null,
+        status:        newStatus,
+        score1:        newScore1,
+        score2:        newScore2,
+        score1Ht:      fdm.score.halfTime.home,
+        score2Ht:      fdm.score.halfTime.away,
+        lockTime,
+      })
+      .onConflictDoUpdate({
+        target: matches.externalId,
+        set: {
+          status:    newStatus,
+          score1:    newScore1,
+          score2:    newScore2,
+          score1Ht:  fdm.score.halfTime.home,
+          score2Ht:  fdm.score.halfTime.away,
+          updatedAt: new Date(),
+        },
+      })
+      .returning()
+
+      if (!upserted) continue
+
+      const wasNew = upserted.createdAt && upserted.updatedAt &&
+        Math.abs(upserted.createdAt.getTime() - upserted.updatedAt.getTime()) < 1000
+
+      if (wasNew) {
+        result.seeded++
+      } else if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
+        await recalcMatchPredictions(upserted.id, newScore1, newScore2)
+
+        if (upserted.stage === 'GROUP_STAGE' && upserted.groupName) {
+          await updateGroupStandings(upserted.groupName, upserted.team1, upserted.team2, newScore1, newScore2)
+          await recalcGroupPredictions(upserted.groupName)
+        }
+        result.updated++
+      }
+    } catch (err) {
+      result.errors.push(`Match ${fdm.id}: ${String(err)}`)
+    }
+  }
+}
+
 export async function syncResults(): Promise<SyncResult> {
-  const result: SyncResult = { updated: 0, errors: [] }
+  const result: SyncResult = { seeded: 0, updated: 0, errors: [] }
 
   try {
-    const fdMatches = await getActiveWCMatches()
+    // Get distinct competitions used by active pollas
+    const activePollas = await db.select({
+      competitionCode: pollas.competitionCode,
+      competitionId:   pollas.competitionId,
+    }).from(pollas).where(eq(pollas.isActive, true))
 
-    for (const fdm of fdMatches) {
+    // Deduplicate by competition code
+    const seen = new Set<string>()
+    const competitions: { competitionCode: string; competitionId: number }[] = []
+    for (const p of activePollas) {
+      const code = p.competitionCode ?? 'WC'
+      if (!seen.has(code)) {
+        seen.add(code)
+        competitions.push({ competitionCode: code, competitionId: p.competitionId ?? 2000 })
+      }
+    }
+
+    // Fallback: if no active pollas, still sync WC (backwards compat)
+    if (competitions.length === 0) {
+      competitions.push({ competitionCode: 'WC', competitionId: 2000 })
+    }
+
+    for (const { competitionCode, competitionId } of competitions) {
       try {
-        const existing = await db.select().from(matches)
-          .where(eq(matches.externalId, String(fdm.id)))
-          .limit(1)
-
-        if (existing.length === 0) continue
-
-        const match = existing[0]
-        const newScore1 = fdm.score.fullTime.home
-        const newScore2 = fdm.score.fullTime.away
-        const newStatus = fdm.status
-
-        // Skip if nothing changed
-        if (
-          match.status === newStatus &&
-          match.score1 === newScore1 &&
-          match.score2 === newScore2
-        ) continue
-
-        await db.update(matches)
-          .set({
-            status: newStatus,
-            score1: newScore1,
-            score2: newScore2,
-            score1Ht: fdm.score.halfTime.home,
-            score2Ht: fdm.score.halfTime.away,
-            updatedAt: new Date(),
-          })
-          .where(eq(matches.id, match.id))
-
-        if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
-          await recalcMatchPredictions(match.id, newScore1, newScore2)
-
-          if (match.stage === 'GROUP_STAGE' && match.groupName) {
-            await updateGroupStandings(match.groupName, match.team1, match.team2, newScore1, newScore2)
-            await recalcGroupPredictions(match.groupName)
-          }
-        }
-
-        result.updated++
+        await syncCompetition(competitionCode, competitionId, result)
       } catch (err) {
-        result.errors.push(`Match ${fdm.id}: ${String(err)}`)
+        result.errors.push(`Competition ${competitionCode}: ${String(err)}`)
       }
     }
   } catch (err) {

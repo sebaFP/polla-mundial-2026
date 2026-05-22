@@ -20,6 +20,11 @@ export const pollas = pgTable('pollas', {
   createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  competitionId:   integer('competition_id').default(2000),
+  competitionCode: text('competition_code').default('WC'),
+  competitionName: text('competition_name').default('FIFA World Cup'),
+  competitionEmblem: text('competition_emblem'),
+  competitionArea: text('competition_area').default('World'),
 })
 
 export const pollaMembers = pgTable('polla_members', {
@@ -46,6 +51,7 @@ export const invitations = pgTable('invitations', {
 export const matches = pgTable('matches', {
   id: serial('id').primaryKey(),
   externalId: text('external_id').unique(),
+  competitionId: integer('competition_id').default(2000),
   stage: text('stage').notNull(),
   groupName: text('group_name'),
   matchday: integer('matchday'),
