@@ -114,7 +114,7 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
                           key={team}
                           onClick={() => !locked && update(groupName, which as 'first' | 'second', team)}
                           disabled={locked || isOtherSelected}
-                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors text-left ${
+                          className={`flex items-center gap-1.5 px-2 py-2 rounded text-xs transition-colors text-left min-h-[40px] ${
                             isSelected
                               ? 'bg-primary text-primary-foreground font-semibold'
                               : isOtherSelected

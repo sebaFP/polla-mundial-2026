@@ -19,7 +19,7 @@ export default function PredictionTabs({ active, pollaSlug }: { active: string; 
           key={tab.id}
           href={tab.href}
           className={cn(
-            'flex-1 text-center py-1.5 px-3 rounded-md text-sm font-medium transition-colors',
+            'flex-1 text-center py-1.5 px-2 sm:px-3 rounded-md text-xs sm:text-sm font-medium transition-colors',
             active === tab.id
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'

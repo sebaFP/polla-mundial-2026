@@ -193,7 +193,7 @@
 
 /* Score input styling */
 .score-input {
-  @apply w-14 h-14 text-center text-2xl font-mono font-bold rounded-xl border-2 border-border bg-input text-foreground focus:border-primary focus:outline-none transition-colors;
+  @apply w-12 h-12 text-xl sm:w-14 sm:h-14 sm:text-2xl text-center font-mono font-bold rounded-xl border-2 border-border bg-input text-foreground focus:border-primary focus:outline-none transition-colors;
 }
 
 /* Scrollbar styling */

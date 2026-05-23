@@ -146,29 +146,25 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
           if (teamsUnresolved) {
             return (
               <Card key={match.id} className="glass-card p-4 opacity-60">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(match.matchDatetime), "d MMM, HH:mm", { locale: es })}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(match.matchDatetime), "d MMM, HH:mm", { locale: es })}
+                  </span>
+                  <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">Próximamente</Badge>
+                </div>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-lg leading-none">🏳️</span>
+                    <span className="font-semibold text-sm text-muted-foreground truncate">
+                      {match.team1Resolved ? match.team1 : 'Por confirmar'}
                     </span>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span className="text-lg leading-none">🏳️</span>
-                        <span className="font-semibold text-sm text-muted-foreground truncate">
-                          {match.team1Resolved ? match.team1 : 'Por confirmar'}
-                        </span>
-                      </div>
-                      <span className="text-muted-foreground text-xs font-mono shrink-0">vs</span>
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-row-reverse sm:flex-row">
-                        <span className="font-semibold text-sm text-muted-foreground truncate">
-                          {match.team2Resolved ? match.team2 : 'Por confirmar'}
-                        </span>
-                        <span className="text-lg leading-none">🏳️</span>
-                      </div>
-                    </div>
                   </div>
-                  <div className="shrink-0">
-                    <Badge variant="outline" className="text-xs text-muted-foreground">Próximamente</Badge>
+                  <span className="text-muted-foreground text-xs font-mono shrink-0">vs</span>
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                    <span className="font-semibold text-sm text-muted-foreground truncate text-right">
+                      {match.team2Resolved ? match.team2 : 'Por confirmar'}
+                    </span>
+                    <span className="text-lg leading-none">🏳️</span>
                   </div>
                 </div>
               </Card>
@@ -177,96 +173,89 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
 
           return (
             <Card key={match.id} className="glass-card p-4">
-              <div className="flex items-center justify-between gap-4">
-                {/* Match info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(match, locked)}
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(match.matchDatetime), "d MMM, HH:mm", { locale: es })}
-                    </span>
-                    {match.venue && <span className="text-xs text-muted-foreground hidden sm:inline">• {match.venue}</span>}
-                  </div>
+              {/* Header: status + date */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {getStatusBadge(match, locked)}
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(match.matchDatetime), "d MMM, HH:mm", { locale: es })}
+                </span>
+                {match.venue && <span className="text-xs text-muted-foreground hidden sm:inline">• {match.venue}</span>}
+              </div>
 
-                  <div className="mt-2 flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-lg leading-none">{getFlag(match.team1)}</span>
-                      <span className="font-semibold text-sm truncate">{match.team1}</span>
-                    </div>
-                    <span className="text-muted-foreground text-xs font-mono shrink-0">vs</span>
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-row-reverse sm:flex-row">
-                      <span className="font-semibold text-sm truncate">{match.team2}</span>
-                      <span className="text-lg leading-none">{getFlag(match.team2)}</span>
-                    </div>
-                  </div>
+              {/* Teams row — full width */}
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-lg leading-none">{getFlag(match.team1)}</span>
+                  <span className="font-semibold text-sm truncate">{match.team1}</span>
                 </div>
-
-                {/* Score area */}
-                <div className="shrink-0">
-                  {match.status === 'FINISHED' && match.score1 !== null ? (
-                    <div className="text-center">
-                      <div className="text-xl font-bold font-mono text-primary">
-                        {match.score1} - {match.score2}
-                      </div>
-                      {pred?.points !== undefined && pred?.points !== null && (
-                        <div className="text-xs text-center mt-1">
-                          <span className={`font-bold ${pred.points > 0 ? 'text-green-400' : 'text-muted-foreground'}`}>
-                            +{pred.points} pts
-                          </span>
-                        </div>
-                      )}
-                      {pred && (
-                        <div className="text-xs text-muted-foreground text-center mt-0.5">
-                          Tu: {pred.s1}-{pred.s2}
-                        </div>
-                      )}
-                    </div>
-                  ) : locked ? (
-                    <div className="text-center">
-                      {pred ? (
-                        <div className="text-lg font-bold font-mono text-muted-foreground">
-                          {pred.s1} - {pred.s2}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sin pronóstico</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={0} max={30}
-                        className="score-input"
-                        value={pred?.s1 ?? ''}
-                        placeholder="0"
-                        onChange={e => updateScore(match.id, 's1', e.target.value)}
-                      />
-                      <span className="text-muted-foreground font-mono">-</span>
-                      <input
-                        type="number"
-                        min={0} max={30}
-                        className="score-input"
-                        value={pred?.s2 ?? ''}
-                        placeholder="0"
-                        onChange={e => updateScore(match.id, 's2', e.target.value)}
-                      />
-                    </div>
-                  )}
+                <span className="text-muted-foreground text-xs font-mono shrink-0">vs</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                  <span className="font-semibold text-sm truncate text-right">{match.team2}</span>
+                  <span className="text-lg leading-none">{getFlag(match.team2)}</span>
                 </div>
               </div>
 
-              {/* Save button */}
-              {!locked && match.status === 'SCHEDULED' && (
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    size="sm"
-                    variant={isDirty ? 'default' : 'outline'}
-                    onClick={() => savePrediction(match.id)}
-                    disabled={saving === match.id || !pred || (pred.s1 === undefined && pred.s2 === undefined)}
-                    className="text-xs"
-                  >
-                    {saving === match.id ? 'Guardando...' : pred?.saved ? '✓ Guardado' : 'Guardar'}
-                  </Button>
+              {/* Score / inputs row */}
+              {match.status === 'FINISHED' && match.score1 !== null ? (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="text-xl font-bold font-mono text-primary">
+                    {match.score1} - {match.score2}
+                  </div>
+                  <div className="text-right">
+                    {pred?.points !== undefined && pred?.points !== null && (
+                      <span className={`text-xs font-bold ${pred.points > 0 ? 'text-green-400' : 'text-muted-foreground'}`}>
+                        +{pred.points} pts
+                      </span>
+                    )}
+                    {pred && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Tu: {pred.s1}-{pred.s2}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : locked ? (
+                <div className="mt-3">
+                  {pred ? (
+                    <div className="text-lg font-bold font-mono text-muted-foreground">
+                      {pred.s1} - {pred.s2}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sin pronóstico</span>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0} max={30}
+                      className="score-input"
+                      value={pred?.s1 ?? ''}
+                      placeholder="0"
+                      onChange={e => updateScore(match.id, 's1', e.target.value)}
+                    />
+                    <span className="text-muted-foreground font-mono">-</span>
+                    <input
+                      type="number"
+                      min={0} max={30}
+                      className="score-input"
+                      value={pred?.s2 ?? ''}
+                      placeholder="0"
+                      onChange={e => updateScore(match.id, 's2', e.target.value)}
+                    />
+                  </div>
+                  {match.status === 'SCHEDULED' && (
+                    <Button
+                      size="sm"
+                      variant={isDirty ? 'default' : 'outline'}
+                      onClick={() => savePrediction(match.id)}
+                      disabled={saving === match.id || !pred || (pred.s1 === undefined && pred.s2 === undefined)}
+                      className="text-xs"
+                    >
+                      {saving === match.id ? 'Guardando...' : pred?.saved ? '✓' : 'Guardar'}
+                    </Button>
+                  )}
                 </div>
               )}
             </Card>

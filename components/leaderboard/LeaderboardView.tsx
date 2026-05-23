@@ -54,7 +54,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
                     {entry.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <p className="text-xs font-semibold mt-1 max-w-16 truncate text-center">{entry.name}</p>
+                <p className="text-xs font-semibold mt-1 max-w-20 truncate text-center">{entry.name}</p>
                 <p className="text-sm font-black text-primary">{entry.totalPoints} pts</p>
               </div>
               <div
@@ -144,15 +144,15 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(230,29,37,0.1)', border: '1px solid rgba(230,29,37,0.3)' }}>
-                <p className="font-black text-sm" style={{ color: '#E61D25' }}>{formatAmount(Math.round(totalPool * prize1Pct / 100), currency)}</p>
+                <p className="font-black text-xs sm:text-sm break-words" style={{ color: '#E61D25' }}>{formatAmount(Math.round(totalPool * prize1Pct / 100), currency)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">1° lugar</p>
               </div>
               <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(42,57,141,0.1)', border: '1px solid rgba(42,57,141,0.3)' }}>
-                <p className="font-black text-sm" style={{ color: '#2A398D' }}>{formatAmount(Math.round(totalPool * prize2Pct / 100), currency)}</p>
+                <p className="font-black text-xs sm:text-sm break-words" style={{ color: '#2A398D' }}>{formatAmount(Math.round(totalPool * prize2Pct / 100), currency)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">2° lugar</p>
               </div>
               <div className="rounded-xl p-2" style={{ backgroundColor: 'rgba(60,172,59,0.1)', border: '1px solid rgba(60,172,59,0.3)' }}>
-                <p className="font-black text-sm" style={{ color: '#3CAC3B' }}>{formatAmount(Math.round(totalPool * prize3Pct / 100), currency)}</p>
+                <p className="font-black text-xs sm:text-sm break-words" style={{ color: '#3CAC3B' }}>{formatAmount(Math.round(totalPool * prize3Pct / 100), currency)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">3° lugar</p>
               </div>
             </div>
@@ -198,11 +198,11 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                     <p className="font-semibold text-sm truncate">{entry.name}</p>
                     {isMe && <Badge className="text-xs bg-primary/20 text-primary border-primary/30 shrink-0">Tú</Badge>}
                   </div>
-                  <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                     <span title="Partidos">⚽ {entry.matchPoints}</span>
                     <span title="Grupos">🏅 {entry.groupPoints}</span>
                     <span title="Especiales">⭐ {entry.specialPoints}</span>
-                    <span className="text-muted-foreground/60">
+                    <span className="text-muted-foreground/60 hidden sm:inline">
                       {entry.scoredMatches}/{entry.predictedMatches} partidos
                     </span>
                   </div>
