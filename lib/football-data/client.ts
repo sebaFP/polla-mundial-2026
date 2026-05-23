@@ -7,13 +7,20 @@ export type FDMatch = {
   stage: string
   group: string | null
   matchday: number | null
-  homeTeam: { name: string; shortName: string }
-  awayTeam: { name: string; shortName: string }
+  homeTeam: { name: string | null; shortName: string | null }
+  awayTeam: { name: string | null; shortName: string | null }
   score: {
     fullTime: { home: number | null; away: number | null }
     halfTime: { home: number | null; away: number | null }
   }
   venue: string | null
+}
+
+const UNRESOLVED_NAMES = new Set(['TBD', 'To Be Determined', 'TBA', ''])
+
+export function isTeamResolved(name: string | null | undefined): boolean {
+  if (!name) return false
+  return !UNRESOLVED_NAMES.has(name.trim())
 }
 
 export type FDResponse = {

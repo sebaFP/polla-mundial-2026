@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { matches, predictions, groupStandings, groupPredictions, pollas } from '@/lib/db/schema'
 import { eq, and, sql, gte, lte } from 'drizzle-orm'
-import { getCompetitionMatches, type FDMatch } from './client'
+import { getCompetitionMatches, isTeamResolved, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
 import { getPollaConfig } from '@/lib/polla'
 
@@ -125,11 +125,13 @@ async function syncCompetition(
 ) {
   // Load all existing matches for this competition (by externalId and by id)
   const existingRows = await db.select({
-    id:           matches.id,
-    externalId:   matches.externalId,
-    matchDatetime: matches.matchDatetime,
-    team1:        matches.team1,
-    team2:        matches.team2,
+    id:             matches.id,
+    externalId:     matches.externalId,
+    matchDatetime:  matches.matchDatetime,
+    team1:          matches.team1,
+    team2:          matches.team2,
+    team1Resolved:  matches.team1Resolved,
+    team2Resolved:  matches.team2Resolved,
   }).from(matches).where(eq(matches.competitionId, competitionId))
 
   // Index by externalId for fast lookup
@@ -171,17 +173,30 @@ async function syncCompetition(
 
       let upserted: typeof matches.$inferSelect | undefined
 
+      const fdTeam1Resolved = isTeamResolved(fdm.homeTeam.name)
+      const fdTeam2Resolved = isTeamResolved(fdm.awayTeam.name)
+
       if (existing) {
-        // Update existing row
+        // Keep old name if API still returns unresolved; upgrade when API provides real name
+        const newTeam1 = fdTeam1Resolved ? fdm.homeTeam.name! : existing.team1
+        const newTeam2 = fdTeam2Resolved ? fdm.awayTeam.name! : existing.team2
+        const newTeam1Resolved = fdTeam1Resolved || !!existing.team1Resolved
+        const newTeam2Resolved = fdTeam2Resolved || !!existing.team2Resolved
+
         const [updated] = await db.update(matches)
           .set({
-            status:    newStatus,
-            score1:    newScore1,
-            score2:    newScore2,
-            score1Ht:  fdm.score.halfTime.home,
-            score2Ht:  fdm.score.halfTime.away,
+            status:        newStatus,
+            score1:        newScore1,
+            score2:        newScore2,
+            score1Ht:      fdm.score.halfTime.home,
+            score2Ht:      fdm.score.halfTime.away,
             groupName,
-            updatedAt: new Date(),
+            team1:         newTeam1,
+            team2:         newTeam2,
+            team1Resolved: newTeam1Resolved,
+            team2Resolved: newTeam2Resolved,
+            lockTime,
+            updatedAt:     new Date(),
           })
           .where(eq(matches.id, existing.id))
           .returning()
@@ -196,10 +211,10 @@ async function syncCompetition(
           groupName,
           matchday:      fdm.matchday ?? null,
           matchDatetime,
-          team1:         fdm.homeTeam.name,
-          team2:         fdm.awayTeam.name,
-          team1Resolved: true,
-          team2Resolved: true,
+          team1:         fdm.homeTeam.name ?? 'TBD',
+          team2:         fdm.awayTeam.name ?? 'TBD',
+          team1Resolved: fdTeam1Resolved,
+          team2Resolved: fdTeam2Resolved,
           venue:         fdm.venue ?? null,
           status:        newStatus,
           score1:        newScore1,

@@ -37,7 +37,7 @@ function getStatusBadge(match: Match, locked: boolean) {
 
 export default function MatchPredictions({ matches, initialPredictions, userId, pollaId }: Props) {
   const [stage, setStage] = useState<string>('GROUP_STAGE')
-  const [selectedGroup, setSelectedGroup] = useState<string>('Group A')
+  const [selectedGroup, setSelectedGroup] = useState<string>('')
   const [preds, setPreds] = useState<PredictionMap>(() => {
     const map: PredictionMap = {}
     for (const p of initialPredictions) {
@@ -57,14 +57,17 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
     return Array.from(gs).sort() as string[]
   }, [matches])
 
+  const activeGroup = selectedGroup && groups.includes(selectedGroup) ? selectedGroup : groups[0] ?? ''
+
   const visibleMatches = useMemo(() => {
     if (stage === 'GROUP_STAGE') {
-      return matches.filter(m => m.stage === 'GROUP_STAGE' && m.groupName === selectedGroup)
+      const group = selectedGroup && groups.includes(selectedGroup) ? selectedGroup : groups[0] ?? ''
+      return matches.filter(m => m.stage === 'GROUP_STAGE' && m.groupName === group)
         .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())
     }
     return matches.filter(m => m.stage === stage)
       .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())
-  }, [matches, stage, selectedGroup])
+  }, [matches, stage, selectedGroup, groups])
 
   async function savePrediction(matchId: number) {
     const pred = preds[matchId]
@@ -118,7 +121,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
               key={g}
               onClick={() => setSelectedGroup(g)}
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                selectedGroup === g
+                activeGroup === g
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-card border border-border text-muted-foreground hover:text-foreground'
               }`}
@@ -138,6 +141,39 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
           const locked = isLocked(match)
           const pred = preds[match.id]
           const isDirty = pred && !pred.saved
+          const teamsUnresolved = !match.team1Resolved || !match.team2Resolved
+
+          if (teamsUnresolved) {
+            return (
+              <Card key={match.id} className="glass-card p-4 opacity-60">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(match.matchDatetime), "d MMM, HH:mm", { locale: es })}
+                    </span>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-lg leading-none">🏳️</span>
+                        <span className="font-semibold text-sm text-muted-foreground truncate">
+                          {match.team1Resolved ? match.team1 : 'Por confirmar'}
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground text-xs font-mono shrink-0">vs</span>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-row-reverse sm:flex-row">
+                        <span className="font-semibold text-sm text-muted-foreground truncate">
+                          {match.team2Resolved ? match.team2 : 'Por confirmar'}
+                        </span>
+                        <span className="text-lg leading-none">🏳️</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    <Badge variant="outline" className="text-xs text-muted-foreground">Próximamente</Badge>
+                  </div>
+                </div>
+              </Card>
+            )
+          }
 
           return (
             <Card key={match.id} className="glass-card p-4">

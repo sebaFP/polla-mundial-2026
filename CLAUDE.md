@@ -17,7 +17,6 @@ pnpm db:generate  # generate migration SQL files
 pnpm db:studio    # open Drizzle Studio (DB browser)
 pnpm db:reset     # ⚠️  WIPE all tables + all Supabase Auth users
 
-pnpm seed         # seed 104 WC 2026 matches + default tournament config
 pnpm seed:admin   # create first admin (reads ADMIN_EMAIL / ADMIN_PASSWORD from .env)
 ```
 
@@ -25,8 +24,8 @@ pnpm seed:admin   # create first admin (reads ADMIN_EMAIL / ADMIN_PASSWORD from 
 ```bash
 pnpm db:reset     # wipe everything
 pnpm db:push      # recreate schema from Drizzle
-pnpm seed         # 104 matches + config
-pnpm seed:admin   # first admin user
+pnpm seed:admin   # create first admin
+# matches auto-seeded on first sync (POST /api/cron/sync-results)
 ```
 
 ## Architecture
@@ -87,9 +86,10 @@ Top scorer:   points_top_scorer   (default 15)
 All values configurable from `/admin/config`.
 
 ### Auto-sync (`lib/football-data/sync.ts`)
-- Calls football-data.org API (`/v4/competitions/WC/matches?status=IN_PLAY,PAUSED,FINISHED`)
-- Updates match scores + status
-- Recalculates prediction points
+- Calls football-data.org API (`/v4/competitions/WC/matches`) — fetches ALL 104 matches every sync
+- Inserts new matches with `team1Resolved`/`team2Resolved` flags based on whether API has real team names
+- Updates existing matches: scores, status, and team names (knockout teams resolve after group stage)
+- Recalculates prediction points for finished matches
 - Updates group standings
 - Triggered by: Vercel cron (hourly) or external cron-job.org (every 5 min) or admin "Sync API" button
 
@@ -168,8 +168,10 @@ await db.insert(users).values({
 ### Recalculate all points for a match
 Call `PATCH /api/admin/results/[matchId]` with `{ score1, score2 }` — recalculates all predictions automatically.
 
-### Reseed matches (if DB is empty)
+### Populate matches (if DB is empty)
+Trigger sync manually:
 ```bash
-pnpm seed
+curl -X POST https://<your-app>/api/cron/sync-results \
+  -H "x-cron-secret: $CRON_SECRET"
 ```
-Fetches from `https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json` and inserts with `onConflictDoNothing`.
+Or use the "Sync API" button in `/admin`. First sync auto-inserts all 104 matches (group + knockout) from football-data.org.
