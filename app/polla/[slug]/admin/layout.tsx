@@ -1,7 +1,6 @@
 import { getSession } from '@/lib/auth/session'
 import { getPollaBySlug, getMemberRole } from '@/lib/polla'
 import { redirect } from 'next/navigation'
-import PollaNav from '@/components/PollaNav'
 
 export default async function PollaAdminLayout({
   children,
@@ -20,20 +19,5 @@ export default async function PollaAdminLayout({
   const myRole = await getMemberRole(polla.id, session.userId)
   if (myRole !== 'admin') redirect(`/polla/${slug}/predictions`)
 
-  return (
-    <div className="relative min-h-screen gradient-bg overflow-x-hidden">
-      <div className="pattern-geo absolute inset-0" aria-hidden />
-      <div className="relative z-10">
-        <PollaNav
-          userName={session.name}
-          pollaName={polla.name}
-          pollaSlug={slug}
-          myRole="admin"
-        />
-        <main className="container mx-auto px-4 py-6 max-w-6xl">
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+  return <>{children}</>
 }
