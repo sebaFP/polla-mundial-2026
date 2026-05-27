@@ -245,7 +245,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
                       onChange={e => updateScore(match.id, 's2', e.target.value)}
                     />
                   </div>
-                  {!['LIVE', 'IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status) && (
+                  {!['LIVE', 'IN_PLAY', 'PAUSED', 'FINISHED'].includes(match.status ?? '') && (
                     <Button
                       size="sm"
                       variant={isDirty ? 'default' : 'outline'}
