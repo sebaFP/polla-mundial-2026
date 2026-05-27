@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { matches, predictions, groupStandings, groupPredictions, pollas } from '@/lib/db/schema'
+import { matches, predictions, groupStandings, groupPredictions, pollas, pollaResultOverrides } from '@/lib/db/schema'
 import { eq, and, sql, gte, lte } from 'drizzle-orm'
 import { getCompetitionMatches, isTeamResolved, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
@@ -59,8 +59,12 @@ async function updateGroupStandings(groupName: string, team1: string, team2: str
   ])
 }
 
-async function recalcMatchPredictions(matchId: number, score1: number, score2: number) {
+async function recalcMatchPredictions(matchId: number, apiScore1: number, apiScore2: number) {
   const preds = await db.select().from(predictions).where(eq(predictions.matchId, matchId))
+
+  // Load per-polla overrides — pollas with an override use their own scores instead of API
+  const overrides = await db.select().from(pollaResultOverrides).where(eq(pollaResultOverrides.matchId, matchId))
+  const overrideMap = new Map(overrides.map(o => [o.pollaId, o]))
 
   const pollaIds = [...new Set(preds.map(p => p.pollaId).filter(Boolean) as string[])]
   const configCache: Record<string, Record<string, string>> = {}
@@ -70,6 +74,9 @@ async function recalcMatchPredictions(matchId: number, score1: number, score2: n
 
   for (const pred of preds) {
     const config = pred.pollaId ? (configCache[pred.pollaId] ?? {}) : {}
+    const override = pred.pollaId ? overrideMap.get(pred.pollaId) : undefined
+    const score1 = override ? override.score1 : apiScore1
+    const score2 = override ? override.score2 : apiScore2
     const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config)
     await db.update(predictions)
       .set({ points: pts, updatedAt: new Date() })

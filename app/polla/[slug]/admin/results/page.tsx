@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
-import { matches } from '@/lib/db/schema'
+import { matches, pollaResultOverrides } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { getPollaBySlug } from '@/lib/polla'
 import { redirect } from 'next/navigation'
@@ -17,6 +18,16 @@ export default async function PollaResultsPage({ params }: { params: Promise<{ s
 
   const allMatches = await db.select().from(matches).orderBy(matches.matchDatetime)
 
+  const overrides = await db.select().from(pollaResultOverrides)
+    .where(eq(pollaResultOverrides.pollaId, polla.id))
+
+  const overrideMap = new Map(overrides.map(o => [o.matchId, { score1: o.score1, score2: o.score2 }]))
+
+  const matchesWithOverrides = allMatches.map(m => ({
+    ...m,
+    override: overrideMap.get(m.id) ?? null,
+  }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -25,7 +36,7 @@ export default async function PollaResultsPage({ params }: { params: Promise<{ s
           Sync automático vía football-data.org o ingresa manualmente
         </p>
       </div>
-      <ResultsManager initialMatches={allMatches} pollaId={polla.id} />
+      <ResultsManager initialMatches={matchesWithOverrides} pollaId={polla.id} />
     </div>
   )
 }

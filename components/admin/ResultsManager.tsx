@@ -10,7 +10,10 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-type Props = { initialMatches: Match[]; pollaId?: string }
+type Override = { score1: number; score2: number }
+type MatchWithOverride = Match & { override: Override | null }
+
+type Props = { initialMatches: MatchWithOverride[]; pollaId?: string }
 
 function StatusBadge({ status }: { status: string | null }) {
   if (status === 'FINISHED') return <Badge className="bg-green-900/50 text-green-300 border-green-700 text-xs">FIN</Badge>
@@ -24,6 +27,7 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [scores, setScores] = useState<Record<number, { s1: string; s2: string }>>({})
   const [saving, setSaving] = useState<number | null>(null)
+  const [resetting, setResetting] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
 
   const stages = useMemo(() => {
@@ -44,7 +48,7 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       const res = await fetch('/api/cron/sync-results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: '' }), // Admin can bypass with empty - TODO: use CRON_SECRET from env
+        body: JSON.stringify({ secret: '' }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -79,7 +83,11 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
-      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, score1: s1, score2: s2, status: 'FINISHED' } : m))
+      setMatches(prev => prev.map(m => m.id === matchId
+        ? { ...m, override: { score1: s1, score2: s2 } }
+        : m
+      ))
+      setScores(prev => { const next = { ...prev }; delete next[matchId]; return next })
       toast.success(`Resultado guardado: ${data.updated} pronósticos actualizados`)
     } catch {
       toast.error('Error al guardar')
@@ -88,9 +96,25 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
     }
   }
 
+  async function resetOverride(matchId: number) {
+    if (!pollaId) return
+    setResetting(matchId)
+    try {
+      const res = await fetch(`/api/pollas/${pollaId}/results/${matchId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, override: null } : m))
+      toast.success(`Override eliminado: ${data.updated} pronósticos recalculados`)
+    } catch {
+      toast.error('Error al resetear')
+    } finally {
+      setResetting(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {/* Sync button */}
+      {/* Stage filter + sync */}
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap gap-2">
           {stages.map(s => (
@@ -114,11 +138,17 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       <div className="space-y-2">
         {visible.map(match => {
           const score = scores[match.id]
+          const hasOverride = !!match.override
+          const isFinishedNoEdit = (hasOverride || (match.status === 'FINISHED' && match.score1 !== null)) && !score
+
           return (
             <Card key={match.id} className="glass-card p-3">
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="shrink-0 min-w-0">
+                <div className="shrink-0 flex items-center gap-1.5 min-w-0">
                   <StatusBadge status={match.status} />
+                  {hasOverride && (
+                    <Badge className="bg-amber-900/50 text-amber-300 border-amber-700 text-xs">🔒 Manual</Badge>
+                  )}
                 </div>
 
                 <div className="text-xs text-muted-foreground shrink-0">
@@ -135,19 +165,36 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
 
                 {/* Score display / input */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {match.status === 'FINISHED' && match.score1 !== null ? (
+                  {isFinishedNoEdit ? (
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-primary font-mono">
-                        {match.score1} - {match.score2}
+                        {hasOverride ? match.override!.score1 : match.score1}
+                        {' - '}
+                        {hasOverride ? match.override!.score2 : match.score2}
                       </span>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="text-xs h-6 px-2"
-                        onClick={() => setScores(prev => ({ ...prev, [match.id]: { s1: String(match.score1), s2: String(match.score2) } }))}
+                        onClick={() => {
+                          const s1 = hasOverride ? match.override!.score1 : match.score1
+                          const s2 = hasOverride ? match.override!.score2 : match.score2
+                          setScores(prev => ({ ...prev, [match.id]: { s1: String(s1), s2: String(s2) } }))
+                        }}
                       >
                         ✏️
                       </Button>
+                      {hasOverride && pollaId && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="text-xs h-6 px-2"
+                          disabled={resetting === match.id}
+                          onClick={() => resetOverride(match.id)}
+                        >
+                          {resetting === match.id ? '...' : 'Resetear'}
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <>

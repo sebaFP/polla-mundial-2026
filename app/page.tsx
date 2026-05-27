@@ -61,6 +61,9 @@ export default async function HomePage() {
             </span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground hidden sm:inline">{session.name}</span>
+              <Link href="/change-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline">
+                Contraseña
+              </Link>
               <form action="/api/auth/logout" method="POST">
                 <Button type="submit" variant="ghost" size="sm" className="text-xs font-semibold">
                   Salir

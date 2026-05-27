@@ -121,6 +121,17 @@ export const groupStandings = pgTable('group_standings', {
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.groupName, t.teamName)])
 
+// Per-polla manual result overrides — takes precedence over API scores for that polla
+export const pollaResultOverrides = pgTable('polla_result_overrides', {
+  id: serial('id').primaryKey(),
+  pollaId: uuid('polla_id').notNull().references(() => pollas.id, { onDelete: 'cascade' }),
+  matchId: integer('match_id').notNull().references(() => matches.id, { onDelete: 'cascade' }),
+  score1: integer('score1').notNull(),
+  score2: integer('score2').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (t) => [unique().on(t.pollaId, t.matchId)])
+
 // Per-polla config (scoring rules, prize pool, etc.)
 export const tournamentConfig = pgTable('tournament_config', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -139,3 +150,4 @@ export type GroupPrediction = typeof groupPredictions.$inferSelect
 export type SpecialPrediction = typeof specialPredictions.$inferSelect
 export type GroupStanding = typeof groupStandings.$inferSelect
 export type TournamentConfig = typeof tournamentConfig.$inferSelect
+export type PollaResultOverride = typeof pollaResultOverrides.$inferSelect
