@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { Menu } from 'lucide-react'
+import { Menu, Link2 } from 'lucide-react'
 
 export default function PollaNav({
   userName,
@@ -31,6 +31,15 @@ export default function PollaNav({
     { href: `${base}/specials`, label: 'Especiales' },
     { href: `${base}/leaderboard`, label: 'Tabla' },
   ]
+
+  function copyJoinLink() {
+    const url = `${window.location.origin}/join/polla/${pollaSlug}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('¡Enlace de invitación copiado!')
+    }).catch(() => {
+      toast.error('No se pudo copiar el enlace')
+    })
+  }
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -98,6 +107,13 @@ export default function PollaNav({
             {/* Desktop user + logout */}
             <div className="hidden sm:flex items-center gap-2 shrink-0">
               <span className="text-xs text-muted-foreground truncate max-w-24">{userName}</span>
+              <Button variant="ghost" size="sm" onClick={copyJoinLink} className="text-xs text-muted-foreground hover:text-foreground gap-1.5">
+                <Link2 className="h-3.5 w-3.5" />
+                Invitar
+              </Button>
+              <Link href="/change-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Contraseña
+              </Link>
               <Button variant="ghost" size="sm" onClick={logout} className="text-xs font-semibold">
                 Salir
               </Button>
@@ -160,11 +176,30 @@ export default function PollaNav({
                     </SheetClose>
                   )}
                 </nav>
-                <div className="pt-4 border-t border-border/60 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground truncate max-w-40">{userName}</span>
-                  <Button variant="ghost" size="sm" onClick={() => { setOpen(false); logout() }} className="text-xs font-semibold">
-                    Salir
-                  </Button>
+                <div className="pt-4 border-t border-border/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground truncate max-w-40">{userName}</span>
+                    <Button variant="ghost" size="sm" onClick={() => { setOpen(false); logout() }} className="text-xs font-semibold">
+                      Salir
+                    </Button>
+                  </div>
+                  <button
+                    onClick={() => { setOpen(false); copyJoinLink() }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-2"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Copiar enlace de invitación
+                  </button>
+                  <SheetClose
+                    render={
+                      <Link
+                        href="/change-password"
+                        className="block px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      />
+                    }
+                  >
+                    🔒 Cambiar contraseña
+                  </SheetClose>
                 </div>
               </SheetContent>
             </Sheet>

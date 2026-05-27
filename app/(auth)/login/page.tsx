@@ -30,7 +30,8 @@ export default function LoginPage() {
         return
       }
       toast.success(`Bienvenido, ${data.name}`)
-      router.push(data.redirect ?? '/')
+      const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+      router.push(redirectTo || data.redirect || '/')
     } catch {
       toast.error('Error de conexión')
     } finally {
