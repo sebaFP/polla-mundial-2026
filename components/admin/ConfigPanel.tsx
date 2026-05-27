@@ -20,6 +20,7 @@ type ConfigItem = {
   type: 'points' | 'toggle'
   min?: number
   max?: number
+  unit?: string
 }
 
 const SCORING_ITEMS: ConfigItem[] = [
@@ -52,7 +53,7 @@ const FEATURE_ITEMS: ConfigItem[] = [
 ]
 
 const LOCK_ITEMS: ConfigItem[] = [
-  { key: 'prediction_lock_minutes', label: 'Minutos de cierre previo', description: 'Minutos antes del partido que se cierran pronósticos', type: 'points', min: 0, max: 120 },
+  { key: 'prediction_lock_minutes', label: 'Minutos de cierre previo', description: 'Minutos antes del partido que se cierran pronósticos', type: 'points', min: 0, max: 120, unit: 'mins' },
 ]
 
 const TABS = [
@@ -63,6 +64,7 @@ const TABS = [
 ]
 
 function PointsSlider({ item, value, onChange }: { item: ConfigItem; value: number; onChange: (v: number) => void }) {
+  const unit = item.unit ?? 'pts'
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -72,7 +74,7 @@ function PointsSlider({ item, value, onChange }: { item: ConfigItem; value: numb
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xl font-bold text-primary font-mono w-8 text-right">{value}</span>
-          <span className="text-xs text-muted-foreground">pts</span>
+          <span className="text-xs text-muted-foreground">{unit}</span>
         </div>
       </div>
       <Slider

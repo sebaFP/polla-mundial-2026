@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
+import { Link2 } from 'lucide-react'
 
 type Member = {
   userId: string
@@ -42,6 +43,7 @@ const STATUS_COLORS: Record<InscriptionStatus, string> = {
 
 type Props = {
   pollaId: string
+  pollaSlug: string
   initialParticipants: Member[]
   inscriptionEnabled: boolean
   inscriptionFee: number
@@ -54,6 +56,7 @@ type Props = {
 
 export default function PollaParticipantsManager({
   pollaId,
+  pollaSlug,
   initialParticipants,
   inscriptionEnabled,
   inscriptionFee,
@@ -127,6 +130,15 @@ export default function PollaParticipantsManager({
   }
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+
+  function copyJoinLink() {
+    const url = `${window.location.origin}/join/polla/${pollaSlug}`
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('¡Enlace de invitación copiado!')
+    }).catch(() => {
+      toast.error('No se pudo copiar el enlace')
+    })
+  }
   const approvedCount = participants.filter(p => p.inscriptionStatus === 'approved').length
   const totalPool = approvedCount * inscriptionFee
 
@@ -134,7 +146,15 @@ export default function PollaParticipantsManager({
     <div className="space-y-6">
       {/* Add participant form */}
       <Card className="glass-card">
-        <CardHeader><CardTitle className="text-base">Agregar Participante por QR</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Agregar Participante por QR</CardTitle>
+            <Button variant="outline" size="sm" onClick={copyJoinLink} className="text-xs gap-1.5 shrink-0">
+              <Link2 className="h-3.5 w-3.5" />
+              Copiar enlace
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent>
           <form onSubmit={createParticipant} className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1.5 flex-1 min-w-36">

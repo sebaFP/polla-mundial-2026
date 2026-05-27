@@ -59,14 +59,8 @@ export async function POST(req: NextRequest) {
   const baseSlug = slugify(name.trim())
   if (!baseSlug) return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 })
 
-  // Ensure slug uniqueness
-  const existing = await db.select({ slug: pollas.slug }).from(pollas)
-  const usedSlugs = new Set(existing.map(p => p.slug))
-  let slug = baseSlug
-  let i = 2
-  while (usedSlugs.has(slug)) {
-    slug = `${baseSlug}-${i++}`
-  }
+  const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+  const slug = `${baseSlug}-${suffix}`
 
   const [polla] = await db.insert(pollas).values({
     name: name.trim(),

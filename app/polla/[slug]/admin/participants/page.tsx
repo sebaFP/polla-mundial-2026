@@ -70,6 +70,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       </div>
       <PollaParticipantsManager
         pollaId={polla.id}
+        pollaSlug={slug}
         initialParticipants={participants}
         inscriptionEnabled={config.inscription_enabled === 'true'}
         inscriptionFee={parseInt(config.inscription_fee ?? '0') || 0}
