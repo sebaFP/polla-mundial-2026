@@ -17,7 +17,7 @@ type Props = {
   pollaId: string
 }
 
-type PredictionMap = Record<number, { s1: number; s2: number; saved: boolean; points?: number | null }>
+type PredictionMap = Record<number, { s1: number | string; s2: number | string; saved: boolean; points?: number | null }>
 
 const GROUP_STAGE_MATCHDAYS = ['Jornada 1', 'Jornada 2', 'Jornada 3']
 
@@ -77,7 +77,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
       const res = await fetch(`/api/pollas/${pollaId}/predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, predictedScore1: pred.s1, predictedScore2: pred.s2 }),
+        body: JSON.stringify({ matchId, predictedScore1: Number(pred.s1), predictedScore2: Number(pred.s2) }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
@@ -91,9 +91,11 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
   }
 
   function updateScore(matchId: number, which: 's1' | 's2', val: string) {
-    const n = parseInt(val)
-    if (isNaN(n) || n < 0 || n > 30) return
-    setPreds(prev => ({ ...prev, [matchId]: { ...(prev[matchId] ?? { s1: 0, s2: 0 }), [which]: n, saved: false } }))
+    if (val !== '') {
+      const n = parseInt(val)
+      if (isNaN(n) || n < 0 || n > 30) return
+    }
+    setPreds(prev => ({ ...prev, [matchId]: { ...(prev[matchId] ?? { s1: '', s2: '' }), [which]: val === '' ? '' : parseInt(val), saved: false } }))
   }
 
   return (
@@ -250,7 +252,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
                       size="sm"
                       variant={isDirty ? 'default' : 'outline'}
                       onClick={() => savePrediction(match.id)}
-                      disabled={saving === match.id || !pred || (pred.s1 === undefined && pred.s2 === undefined)}
+                      disabled={saving === match.id || !pred || pred.s1 === '' || pred.s2 === '' || (pred.s1 === undefined && pred.s2 === undefined)}
                       className="text-xs"
                     >
                       {saving === match.id ? 'Guardando...' : pred?.saved ? '✓' : 'Guardar'}
