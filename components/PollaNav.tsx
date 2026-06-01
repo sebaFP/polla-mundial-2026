@@ -30,11 +30,15 @@ export default function PollaNav({
   pollaName,
   pollaSlug,
   myRole,
+  isSuperAdmin = false,
+  pendingResetCount = 0,
 }: {
   userName: string
   pollaName: string
   pollaSlug: string
   myRole: 'admin' | 'participant'
+  isSuperAdmin?: boolean
+  pendingResetCount?: number
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -159,6 +163,19 @@ export default function PollaNav({
                   Invitar
                 </Button>
               )}
+              {isSuperAdmin && (
+                <Link
+                  href={pendingResetCount > 0 ? '/superadmin/reset-requests' : '/superadmin/users'}
+                  className="relative px-2 py-1 rounded text-xs font-bold text-primary/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  ★ Super
+                  {pendingResetCount > 0 && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-[9px] font-bold text-white leading-none">
+                      {pendingResetCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               <Button variant="ghost" size="sm" onClick={logout} className="text-xs font-semibold">
                 Salir
               </Button>
@@ -207,6 +224,28 @@ export default function PollaNav({
                       </SheetClose>
                     )
                   })}
+
+                  {isSuperAdmin && (
+                    <div className="pt-4">
+                      <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-primary/50">Super Admin</p>
+                      <SheetClose
+                        render={
+                          <Link
+                            href="/superadmin/users"
+                            className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold text-primary/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                          />
+                        }
+                      >
+                        <ShieldCheck className="h-4 w-4 shrink-0" />
+                        Panel Super Admin
+                        {pendingResetCount > 0 && (
+                          <span className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full bg-destructive text-[10px] font-bold text-white">
+                            {pendingResetCount}
+                          </span>
+                        )}
+                      </SheetClose>
+                    </div>
+                  )}
 
                   {myRole === 'admin' && (
                     <div className="pt-4">
