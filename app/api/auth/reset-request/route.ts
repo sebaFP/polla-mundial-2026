@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { users, passwordResetRequests } from '@/lib/db/schema'
-import { eq, and, eq as drizzleEq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { sendResetRequestNotification } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,9 +16,8 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
-    // Look up user by email (may be null if not found)
     const [user] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, name: users.name })
       .from(users)
       .where(eq(users.email, normalizedEmail))
       .limit(1)
@@ -28,6 +28,21 @@ export async function POST(req: NextRequest) {
       message: message.trim(),
       status: 'pending',
     })
+
+    // Notify all super admins by email (fire-and-forget)
+    const superAdmins = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.isSuperAdmin, true))
+
+    const adminEmails = superAdmins.map(a => a.email).filter(Boolean) as string[]
+
+    sendResetRequestNotification({
+      adminEmails,
+      requesterEmail: normalizedEmail,
+      requesterName: user?.name ?? null,
+      message: message.trim(),
+    }).catch(console.error)
 
     return NextResponse.json({ ok: true })
   } catch (err) {

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { db } from '@/lib/db'
-import { passwordResetRequests } from '@/lib/db/schema'
+import { passwordResetRequests, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { sendTempPassword } from '@/lib/email'
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -26,8 +27,15 @@ export async function POST(
   const { requestId } = await params
 
   const [request] = await db
-    .select()
+    .select({
+      id: passwordResetRequests.id,
+      userId: passwordResetRequests.userId,
+      email: passwordResetRequests.email,
+      status: passwordResetRequests.status,
+      userName: users.name,
+    })
     .from(passwordResetRequests)
+    .leftJoin(users, eq(passwordResetRequests.userId, users.id))
     .where(eq(passwordResetRequests.id, requestId))
     .limit(1)
 
@@ -54,6 +62,13 @@ export async function POST(
     .update(passwordResetRequests)
     .set({ status: 'resolved', resolvedAt: new Date(), resolvedById: session.userId })
     .where(eq(passwordResetRequests.id, requestId))
+
+  // Send temp password to user by email (fire-and-forget)
+  sendTempPassword({
+    toEmail: request.email,
+    toName: request.userName ?? request.email,
+    tempPassword,
+  }).catch(console.error)
 
   return NextResponse.json({ tempPassword })
 }

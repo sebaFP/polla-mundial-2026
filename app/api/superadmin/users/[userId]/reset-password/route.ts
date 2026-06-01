@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { db } from '@/lib/db'
+import { users } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { sendTempPassword } from '@/lib/email'
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -22,6 +26,12 @@ export async function POST(
 
   const { userId } = await params
 
+  const [user] = await db
+    .select({ name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+
   const tempPassword = generateTempPassword()
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
@@ -31,6 +41,14 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+
+  if (user?.email && !user.email.includes('@polla.internal')) {
+    sendTempPassword({
+      toEmail: user.email,
+      toName: user.name,
+      tempPassword,
+    }).catch(console.error)
   }
 
   return NextResponse.json({ tempPassword })
