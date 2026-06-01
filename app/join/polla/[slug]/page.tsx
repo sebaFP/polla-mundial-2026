@@ -5,6 +5,7 @@ import { getPollaBySlug, getMemberRole } from '@/lib/polla'
 import { getSession } from '@/lib/auth/session'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import JoinPollaRequestForm from '@/components/JoinPollaRequestForm'
+import RedirectCountdown from '@/components/RedirectCountdown'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -90,7 +91,7 @@ export default async function JoinPollaPage({ params }: { params: Promise<{ slug
 
     const status = member?.inscriptionStatus ?? 'pending'
 
-    if (status === 'approved') {
+    if (status === 'approved' || status === 'confirmed') {
       redirect(`/polla/${slug}/predictions`)
     }
 
@@ -107,6 +108,15 @@ export default async function JoinPollaPage({ params }: { params: Promise<{ slug
                 Ya eres miembro de esta polla. Estado: <span className="font-semibold text-foreground">{label}</span>
               </CardDescription>
             </CardHeader>
+            <CardContent className="space-y-3">
+              <RedirectCountdown to="/" />
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center w-full h-9 px-4 py-2 rounded-md text-sm font-bold tracking-wide border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                IR AL INICIO
+              </Link>
+            </CardContent>
           </Card>
         </div>
       </div>
