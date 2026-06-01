@@ -8,12 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const [showReset, setShowReset] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetMessage, setResetMessage] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -39,12 +46,32 @@ export default function LoginPage() {
     }
   }
 
+  async function handleResetRequest(e: React.FormEvent) {
+    e.preventDefault()
+    setResetLoading(true)
+    try {
+      const res = await fetch('/api/auth/reset-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, message: resetMessage }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Error al enviar solicitud')
+        return
+      }
+      setResetSent(true)
+    } catch {
+      toast.error('Error de conexión')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
   return (
     <div className="relative min-h-screen gradient-bg flex items-center justify-center p-4 overflow-hidden">
-      {/* Geometric background pattern */}
       <div className="pattern-geo absolute inset-0" />
 
-      {/* Decorative "26" backdrop */}
       <div
         className="absolute right-[-4rem] top-[-3rem] text-[20rem] font-black leading-none select-none pointer-events-none opacity-[0.04]"
         style={{ color: '#2A398D' }}
@@ -80,43 +107,119 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
-          <CardHeader>
-            <CardTitle className="text-xl font-bold">Iniciar sesión</CardTitle>
-            <CardDescription>Admin o participante con contraseña</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-              <Button type="submit" className="w-full font-bold tracking-wide" disabled={loading}>
-                {loading ? 'Ingresando...' : 'INGRESAR'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {!showReset ? (
+          <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">Iniciar sesión</CardTitle>
+              <CardDescription>Admin o participante con contraseña</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+                <Button type="submit" className="w-full font-bold tracking-wide" disabled={loading}>
+                  {loading ? 'Ingresando...' : 'INGRESAR'}
+                </Button>
+                <button
+                  type="button"
+                  className="w-full text-xs text-muted-foreground hover:text-primary transition-colors text-center"
+                  onClick={() => { setResetEmail(email); setShowReset(true) }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">Recuperar contraseña</CardTitle>
+              <CardDescription>
+                Tu solicitud llegará al administrador, quien restablecerá tu contraseña.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {resetSent ? (
+                <div className="space-y-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Solicitud enviada. El administrador revisará tu mensaje y restablecerá tu contraseña pronto.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => { setShowReset(false); setResetSent(false) }}
+                  >
+                    Volver al inicio de sesión
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleResetRequest} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email de tu cuenta</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={resetEmail}
+                      onChange={e => setResetEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-message">Mensaje para el administrador</Label>
+                    <Textarea
+                      id="reset-message"
+                      placeholder="Cuéntale al admin quién eres y por qué necesitas recuperar tu contraseña..."
+                      value={resetMessage}
+                      onChange={e => setResetMessage(e.target.value)}
+                      required
+                      minLength={10}
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full font-bold tracking-wide"
+                    disabled={resetLoading || resetMessage.length < 10}
+                  >
+                    {resetLoading ? 'Enviando...' : 'ENVIAR SOLICITUD'}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-xs text-muted-foreground hover:text-primary transition-colors text-center"
+                    onClick={() => setShowReset(false)}
+                  >
+                    Volver al inicio de sesión
+                  </button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <p className="text-center text-sm text-muted-foreground">
           ¿Sin cuenta?{' '}

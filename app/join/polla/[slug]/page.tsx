@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { getPollaBySlug, getMemberRole } from '@/lib/polla'
@@ -89,6 +89,11 @@ export default async function JoinPollaPage({ params }: { params: Promise<{ slug
       .limit(1)
 
     const status = member?.inscriptionStatus ?? 'pending'
+
+    if (status === 'approved') {
+      redirect(`/polla/${slug}/predictions`)
+    }
+
     const label = STATUS_LABELS[status] ?? status
 
     return (
@@ -102,16 +107,6 @@ export default async function JoinPollaPage({ params }: { params: Promise<{ slug
                 Ya eres miembro de esta polla. Estado: <span className="font-semibold text-foreground">{label}</span>
               </CardDescription>
             </CardHeader>
-            {status === 'approved' && (
-              <CardContent>
-                <Link
-                  href={`/polla/${slug}/predictions`}
-                  className="inline-flex items-center justify-center w-full h-9 px-4 py-2 rounded-md text-sm font-bold tracking-wide bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  IR A LA POLLA
-                </Link>
-              </CardContent>
-            )}
           </Card>
         </div>
       </div>

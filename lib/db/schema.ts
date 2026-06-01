@@ -140,6 +140,17 @@ export const tournamentConfig = pgTable('tournament_config', {
   value: text('value').notNull(),
 }, (t) => [unique().on(t.pollaId, t.key)])
 
+export const passwordResetRequests = pgTable('password_reset_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  message: text('message').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'resolved'
+  createdAt: timestamp('created_at').defaultNow(),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedById: uuid('resolved_by_id').references(() => users.id),
+})
+
 export type User = typeof users.$inferSelect
 export type Polla = typeof pollas.$inferSelect
 export type PollaMember = typeof pollaMembers.$inferSelect

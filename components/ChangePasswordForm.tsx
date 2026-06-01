@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 
-export default function ChangePasswordForm({ email }: { email: string }) {
+export default function ChangePasswordForm({ email, forcedChange = false }: { email: string; forcedChange?: boolean }) {
   const router = useRouter()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -55,10 +55,15 @@ export default function ChangePasswordForm({ email }: { email: string }) {
         <Card className="glass-card border-border">
           <CardHeader>
             <CardTitle className="text-xl">Nueva contraseña</CardTitle>
-            <CardDescription>Mínimo 8 caracteres</CardDescription>
+            <CardDescription>
+              {forcedChange
+                ? 'Un administrador restableció tu contraseña. Debes crear una nueva antes de continuar.'
+                : 'Mínimo 8 caracteres'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {!forcedChange && (
               <div className="space-y-2">
                 <Label htmlFor="current">Contraseña actual</Label>
                 <Input
@@ -71,6 +76,7 @@ export default function ChangePasswordForm({ email }: { email: string }) {
                   autoComplete="current-password"
                 />
               </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="next">Nueva contraseña</Label>
                 <Input
@@ -108,14 +114,16 @@ export default function ChangePasswordForm({ email }: { email: string }) {
               <Button type="submit" className="w-full" disabled={loading || next.length < 8}>
                 {loading ? 'Guardando...' : 'Guardar cambios'}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full text-muted-foreground text-xs"
-                onClick={() => router.push('/')}
-              >
-                Cancelar
-              </Button>
+              {!forcedChange && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-muted-foreground text-xs"
+                  onClick={() => router.push('/')}
+                >
+                  Cancelar
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

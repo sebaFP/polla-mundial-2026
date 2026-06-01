@@ -47,9 +47,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Superadmin routes — DB check happens in route handlers, middleware only ensures auth
-  // Polla admin routes — admin check happens in route handlers
-  // All other authenticated routes just need a valid session
+  // Force password change if flagged
+  const mustChange = user.app_metadata?.mustChangePassword === true
+  if (mustChange && pathname !== '/change-password' && !pathname.startsWith('/api/auth/') && !pathname.startsWith('/api/')) {
+    return NextResponse.redirect(new URL('/change-password', req.url))
+  }
 
   return response
 }
