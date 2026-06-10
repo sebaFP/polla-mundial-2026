@@ -23,6 +23,9 @@ type Member = {
   totalPoints: number
   predictedMatches: number
   qrToken: string | null
+  groupPredCount: number
+  specialPredCount: number
+  questionsAnswered: number
 }
 
 type InscriptionStatus = 'pending' | 'confirmed' | 'approved' | 'rejected'
@@ -52,6 +55,10 @@ type Props = {
   prize1Pct: number
   prize2Pct: number
   prize3Pct: number
+  featureGroupPredictions: boolean
+  featureSpecialPredictions: boolean
+  featureCustomQuestions: boolean
+  totalQuestions: number
 }
 
 export default function PollaParticipantsManager({
@@ -65,6 +72,10 @@ export default function PollaParticipantsManager({
   prize1Pct,
   prize2Pct,
   prize3Pct,
+  featureGroupPredictions,
+  featureSpecialPredictions,
+  featureCustomQuestions,
+  totalQuestions,
 }: Props) {
   const [participants, setParticipants] = useState(initialParticipants)
   const [name, setName] = useState('')
@@ -86,7 +97,7 @@ export default function PollaParticipantsManager({
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
-      setParticipants(prev => [...prev, { ...data, totalPoints: 0, predictedMatches: 0 }])
+      setParticipants(prev => [...prev, { ...data, totalPoints: 0, predictedMatches: 0, groupPredCount: 0, specialPredCount: 0, questionsAnswered: 0 }])
       setName('')
       setEmail('')
       toast.success(`¡${data.name} agregado!`)
@@ -223,6 +234,26 @@ export default function PollaParticipantsManager({
                     </Badge>
                   )}
                   <span className="text-xs text-muted-foreground">{p.totalPoints} pts</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  <Badge className={`text-[10px] border px-1.5 py-0 ${p.predictedMatches > 0 ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+                    {p.predictedMatches > 0 ? `${p.predictedMatches} partidos` : 'Sin partidos'}
+                  </Badge>
+                  {featureGroupPredictions && (
+                    <Badge className={`text-[10px] border px-1.5 py-0 ${p.groupPredCount > 0 ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+                      {p.groupPredCount > 0 ? 'Grupos ✓' : 'Grupos ✗'}
+                    </Badge>
+                  )}
+                  {featureSpecialPredictions && (
+                    <Badge className={`text-[10px] border px-1.5 py-0 ${p.specialPredCount > 0 ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+                      {p.specialPredCount > 0 ? 'Especiales ✓' : 'Especiales ✗'}
+                    </Badge>
+                  )}
+                  {featureCustomQuestions && (
+                    <Badge className={`text-[10px] border px-1.5 py-0 ${p.questionsAnswered > 0 ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+                      {p.questionsAnswered > 0 ? `${p.questionsAnswered}/${totalQuestions} preguntas` : 'Preguntas ✗'}
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0 flex-wrap justify-end">
