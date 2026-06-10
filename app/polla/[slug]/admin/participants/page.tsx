@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { pollaMembers, users, invitations, predictions, groupPredictions, specialPredictions, pollaAnswers, pollaQuestions } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
 import PollaParticipantsManager from '@/components/admin/PollaParticipantsManager'
+import BulkImportPanel from '@/components/admin/BulkImportPanel'
 
 export const revalidate = 0
 
@@ -98,6 +99,8 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       questionsAnswered: ansMap[m.userId] ?? 0,
     }))
 
+  const participantOptions = participants.map(m => ({ userId: m.userId, name: m.name }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -122,6 +125,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
         featureCustomQuestions={featQuestions}
         totalQuestions={totalQuestions}
       />
+      <BulkImportPanel pollaId={polla.id} participants={participantOptions} />
     </div>
   )
 }
