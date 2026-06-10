@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { getConfigValue, getRangeOptions } from '@/lib/scoring'
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
 
 type Props = {
   teams: string[]
@@ -72,11 +73,6 @@ export default function SpecialPredictionsForm({ teams, initialSpecials, config,
   })
 
   const [saving, setSaving] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-
-  const filteredTeams = teams.filter(t =>
-    t.toLowerCase().includes(search.toLowerCase())
-  )
 
   async function saveTeam(type: string) {
     const pred = teamPreds[type]
@@ -173,29 +169,24 @@ export default function SpecialPredictionsForm({ teams, initialSpecials, config,
 
               {!isLocked && (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Buscar equipo..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full mb-2 px-3 py-1.5 text-sm rounded-md bg-input border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                  />
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
-                    {filteredTeams.map(team => (
-                      <button
-                        key={team}
-                        onClick={() => selectTeam(type, team)}
-                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors text-left ${
-                          pred?.team === team
-                            ? 'bg-primary text-primary-foreground font-semibold'
-                            : 'bg-card border border-border hover:border-primary'
-                        }`}
-                      >
-                        <span>{getFlag(team)}</span>
-                        <span className="truncate">{team}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <Combobox
+                    items={teams}
+                    value={pred?.team ?? null}
+                    onValueChange={(val) => selectTeam(type, val as string)}
+                  >
+                    <ComboboxInput placeholder="Buscar equipo..." className="w-full mb-2" showClear />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No se encontró ningún equipo.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(team) => (
+                          <ComboboxItem key={team} value={team}>
+                            <span>{getFlag(team)}</span>
+                            <span>{team}</span>
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
 
                   <Button
                     size="sm"
@@ -251,31 +242,24 @@ export default function SpecialPredictionsForm({ teams, initialSpecials, config,
                   {!isLocked && (
                     <>
                       {bonusType.kind === 'team' ? (
-                        <>
-                          <input
-                            type="text"
-                            placeholder="Buscar equipo..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="w-full mb-2 px-3 py-1.5 text-sm rounded-md bg-input border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                          />
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
-                            {filteredTeams.map(team => (
-                              <button
-                                key={team}
-                                onClick={() => selectBonus(bonusType.type, team)}
-                                className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors text-left ${
-                                  pred?.value === team
-                                    ? 'bg-primary text-primary-foreground font-semibold'
-                                    : 'bg-card border border-border hover:border-primary'
-                                }`}
-                              >
-                                <span>{getFlag(team)}</span>
-                                <span className="truncate">{team}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </>
+                        <Combobox
+                          items={teams}
+                          value={pred?.value ?? null}
+                          onValueChange={(val) => selectBonus(bonusType.type, val as string)}
+                        >
+                          <ComboboxInput placeholder="Buscar equipo..." className="w-full mb-2" showClear />
+                          <ComboboxContent>
+                            <ComboboxEmpty>No se encontró ningún equipo.</ComboboxEmpty>
+                            <ComboboxList>
+                              {(team) => (
+                                <ComboboxItem key={team} value={team}>
+                                  <span>{getFlag(team)}</span>
+                                  <span>{team}</span>
+                                </ComboboxItem>
+                              )}
+                            </ComboboxList>
+                          </ComboboxContent>
+                        </Combobox>
                       ) : bonusType.kind === 'range' ? (
                         <div className="flex flex-col gap-2">
                           {getRangeOptions(config, bonusType.type).map(opt => (
