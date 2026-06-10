@@ -14,6 +14,15 @@ type Props = {
   matches: Match[]
   standings: GroupStanding[]
   pollaId: string
+  lockedGroupNames?: string[]
+}
+
+type PredState = {
+  first: string
+  second: string
+  third: string
+  saved: boolean
+  manualOverride: boolean
 }
 
 function isGroupLocked(groupName: string, matches: Match[]): boolean {
@@ -23,15 +32,25 @@ function isGroupLocked(groupName: string, matches: Match[]): boolean {
   return first.lockTime ? new Date() >= new Date(first.lockTime) : false
 }
 
-export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings, pollaId }: Props) {
-  const [preds, setPreds] = useState<Record<string, { first: string; second: string; saved: boolean }>>(() => {
-    const map: Record<string, { first: string; second: string; saved: boolean }> = {}
+export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings, pollaId, lockedGroupNames = [] }: Props) {
+  const adminLockedSet = new Set(lockedGroupNames)
+
+  const [preds, setPreds] = useState<Record<string, PredState>>(() => {
+    const map: Record<string, PredState> = {}
     for (const p of initialPredictions) {
-      map[p.groupName] = { first: p.firstPlace, second: p.secondPlace, saved: true }
+      map[p.groupName] = {
+        first: p.firstPlace,
+        second: p.secondPlace,
+        third: p.thirdPlace ?? '',
+        saved: true,
+        manualOverride: p.isManualOverride,
+      }
     }
     return map
   })
+
   const [saving, setSaving] = useState<string | null>(null)
+  const [resetting, setResetting] = useState<string | null>(null)
 
   const groups = Object.keys(groupsMap).sort()
 
@@ -39,17 +58,18 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
     const pred = preds[groupName]
     if (!pred?.first || !pred?.second) { toast.error('Selecciona 1° y 2° lugar'); return }
     if (pred.first === pred.second) { toast.error('Deben ser equipos diferentes'); return }
+    if (pred.third && (pred.third === pred.first || pred.third === pred.second)) { toast.error('El 3° debe ser diferente al 1° y 2°'); return }
     setSaving(groupName)
     try {
       const res = await fetch(`/api/pollas/${pollaId}/group-predictions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupName, firstPlace: pred.first, secondPlace: pred.second }),
+        body: JSON.stringify({ groupName, firstPlace: pred.first, secondPlace: pred.second, thirdPlace: pred.third || null }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
-      setPreds(prev => ({ ...prev, [groupName]: { ...prev[groupName], saved: true } }))
-      toast.success(`Grupo ${groupName.replace('Group ', '')} guardado`)
+      setPreds(prev => ({ ...prev, [groupName]: { ...prev[groupName], saved: true, manualOverride: true } }))
+      toast.success(`Grupo ${groupName.replace('GROUP_', '')} guardado`)
     } catch {
       toast.error('Error al guardar')
     } finally {
@@ -57,8 +77,43 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
     }
   }
 
-  function update(groupName: string, which: 'first' | 'second', team: string) {
-    setPreds(prev => ({ ...prev, [groupName]: { ...(prev[groupName] ?? { first: '', second: '' }), [which]: team, saved: false } }))
+  async function resetToAuto(groupName: string) {
+    setResetting(groupName)
+    try {
+      const res = await fetch(`/api/pollas/${pollaId}/group-predictions/${encodeURIComponent(groupName)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error('Error al restablecer'); return }
+      if (data) {
+        setPreds(prev => ({
+          ...prev,
+          [groupName]: {
+            first: data.firstPlace,
+            second: data.secondPlace,
+            third: data.thirdPlace ?? '',
+            saved: true,
+            manualOverride: false,
+          },
+        }))
+        toast.success('Restablecido al cálculo automático')
+      } else {
+        setPreds(prev => {
+          const next = { ...prev }
+          delete next[groupName]
+          return next
+        })
+        toast.success('Override eliminado — sin predicciones de partidos aún')
+      }
+    } catch {
+      toast.error('Error al restablecer')
+    } finally {
+      setResetting(null)
+    }
+  }
+
+  function update(groupName: string, which: 'first' | 'second' | 'third', team: string) {
+    setPreds(prev => ({ ...prev, [groupName]: { ...(prev[groupName] ?? { first: '', second: '', third: '', saved: false, manualOverride: false }), [which]: team, saved: false } }))
   }
 
   return (
@@ -67,6 +122,7 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
         const teams = groupsMap[groupName]
         const pred = preds[groupName]
         const locked = isGroupLocked(groupName, matches)
+        const adminLocked = adminLockedSet.has(groupName)
         const groupStandings = standings
           .filter(s => s.groupName === groupName)
           .sort((a, b) => {
@@ -79,13 +135,13 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-bold text-primary">
-                  {groupName}
+                  {groupName.replace('GROUP_', 'Grupo ')}
                 </CardTitle>
                 {locked && <Badge variant="destructive" className="text-xs">Cerrado</Badge>}
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Current standings if available */}
+              {/* Actual standings if available */}
               {groupStandings.length > 0 && (
                 <div className="text-xs space-y-1 mb-2">
                   {groupStandings.map((s, i) => (
@@ -99,25 +155,57 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
                 </div>
               )}
 
+              {/* Manual override warning */}
+              {pred?.manualOverride && !locked && (
+                <div className="rounded-md bg-amber-900/20 border border-amber-700/40 p-2 text-xs space-y-1.5">
+                  <p className="text-amber-300">Selección manual activa — sobreescribe el cálculo automático</p>
+                  <button
+                    onClick={() => resetToAuto(groupName)}
+                    disabled={resetting === groupName}
+                    className="text-amber-400 underline underline-offset-2 hover:text-amber-200 disabled:opacity-50"
+                  >
+                    {resetting === groupName ? 'Restableciendo...' : 'Restablecer al automático'}
+                  </button>
+                </div>
+              )}
+
+              {/* Admin locked standings notice */}
+              {adminLocked && (
+                <div className="rounded-md bg-yellow-900/20 border border-yellow-700/40 p-2 text-xs text-yellow-300">
+                  Clasificación fijada por el admin
+                </div>
+              )}
+
+              {/* Auto-calc badge */}
+              {pred && !pred.manualOverride && pred.saved && !locked && (
+                <div className="text-xs text-muted-foreground italic">
+                  Calculado automáticamente desde tus pronósticos
+                </div>
+              )}
+
               {/* Predictions */}
-              {['first', 'second'].map(which => (
+              {(['first', 'second', 'third'] as const).map(which => (
                 <div key={which}>
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    {which === 'first' ? '🥇 1° Lugar' : '🥈 2° Lugar'}
+                    {which === 'first' ? '🥇 1° Lugar' : which === 'second' ? '🥈 2° Lugar' : '🥉 3° Lugar'}
                   </p>
                   <div className="grid grid-cols-2 gap-1">
                     {teams.map(team => {
-                      const isSelected = pred?.[which as 'first' | 'second'] === team
-                      const isOtherSelected = (which === 'first' ? pred?.second : pred?.first) === team
+                      const isSelected = pred?.[which] === team
+                      const isBlockedByOther = (
+                        (which === 'first' && (pred?.second === team || pred?.third === team)) ||
+                        (which === 'second' && (pred?.first === team || pred?.third === team)) ||
+                        (which === 'third' && (pred?.first === team || pred?.second === team))
+                      )
                       return (
                         <button
                           key={team}
-                          onClick={() => !locked && update(groupName, which as 'first' | 'second', team)}
-                          disabled={locked || isOtherSelected}
+                          onClick={() => !locked && update(groupName, which, team)}
+                          disabled={locked || isBlockedByOther}
                           className={`flex items-center gap-1.5 px-2 py-2 rounded text-xs transition-colors text-left min-h-[40px] ${
                             isSelected
                               ? 'bg-primary text-primary-foreground font-semibold'
-                              : isOtherSelected
+                              : isBlockedByOther
                               ? 'opacity-30 cursor-not-allowed bg-card'
                               : locked
                               ? 'bg-card text-muted-foreground cursor-not-allowed'

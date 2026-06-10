@@ -1,17 +1,19 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
-function getTabs(pollaSlug?: string) {
+function getTabs(pollaSlug?: string, showQuestions?: boolean) {
   const base = pollaSlug ? `/polla/${pollaSlug}` : ''
-  return [
+  const tabs = [
     { href: `${base}/predictions`, label: '⚽ Partidos', id: 'matches' },
     { href: `${base}/groups`, label: '🏅 Clasificados', id: 'groups' },
     { href: `${base}/specials`, label: '⭐ Especiales', id: 'specials' },
   ]
+  if (showQuestions) tabs.push({ href: `${base}/questions`, label: '❓ Preguntas', id: 'questions' })
+  return tabs
 }
 
-export default function PredictionTabs({ active, pollaSlug }: { active: string; pollaSlug?: string }) {
-  const tabs = getTabs(pollaSlug)
+export default function PredictionTabs({ active, pollaSlug, showQuestions }: { active: string; pollaSlug?: string; showQuestions?: boolean }) {
+  const tabs = getTabs(pollaSlug, showQuestions)
   return (
     <div className="flex gap-1 bg-card border border-border rounded-lg p-1">
       {tabs.map(tab => (

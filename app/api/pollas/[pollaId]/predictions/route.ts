@@ -3,7 +3,8 @@ import { db } from '@/lib/db'
 import { predictions, matches } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getMemberRole, isPollaOpen, getPollaById } from '@/lib/polla'
+import { getMemberRole, isPollaOpen, getPollaById, getPollaConfig } from '@/lib/polla'
+import { autoFillGroupPrediction } from '@/lib/group-auto-fill'
 
 type RouteContext = { params: Promise<{ pollaId: string }> }
 
@@ -66,6 +67,22 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
   }
 
+  if (match[0].stage !== 'GROUP_STAGE') {
+    const pollaConfig = await getPollaConfig(pollaId)
+    if (pollaConfig['knockout_prediction_mode'] === 'sequential') {
+      const stageOrder = ['GROUP_STAGE', 'LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
+      const idx = stageOrder.indexOf(match[0].stage)
+      if (idx > 0) {
+        const prevStage = stageOrder[idx - 1]
+        const prevMatches = await db.select({ status: matches.status }).from(matches).where(eq(matches.stage, prevStage))
+        const allFinished = prevMatches.length > 0 && prevMatches.every(m => m.status === 'FINISHED')
+        if (!allFinished) {
+          return NextResponse.json({ error: 'Esta ronda aún no está disponible' }, { status: 403 })
+        }
+      }
+    }
+  }
+
   const existing = await db.select().from(predictions)
     .where(and(
       eq(predictions.userId, session.userId),
@@ -79,6 +96,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .set({ predictedScore1, predictedScore2, updatedAt: new Date() })
       .where(eq(predictions.id, existing[0].id))
       .returning()
+
+    if (match[0].stage === 'GROUP_STAGE' && match[0].groupName) {
+      await autoFillGroupPrediction(pollaId, session.userId, match[0].groupName)
+    }
+
     return NextResponse.json(updated[0])
   }
 
@@ -89,6 +111,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     predictedScore1,
     predictedScore2,
   }).returning()
+
+  if (match[0].stage === 'GROUP_STAGE' && match[0].groupName) {
+    await autoFillGroupPrediction(pollaId, session.userId, match[0].groupName)
+  }
 
   return NextResponse.json(created[0], { status: 201 })
 }

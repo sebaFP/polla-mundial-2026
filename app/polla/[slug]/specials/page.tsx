@@ -1,11 +1,12 @@
 import { db } from '@/lib/db'
-import { matches, specialPredictions } from '@/lib/db/schema'
+import { matches, specialPredictions, pollaMembers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getPollaBySlug, getPollaConfig } from '@/lib/polla'
+import { getPollaBySlug, getPollaConfig, getMemberRole } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import SpecialPredictionsForm from '@/components/predictions/SpecialPredictionsForm'
 import PredictionTabs from '@/components/predictions/PredictionTabs'
+import ImportPredictionsButton from '@/components/predictions/ImportPredictionsButton'
 
 export const revalidate = 60
 
@@ -17,13 +18,22 @@ export default async function PollaSpecialsPage({ params }: { params: Promise<{ 
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
-  const [allMatches, mySpecials, config] = await Promise.all([
+  const [allMatches, mySpecials, config, myRole] = await Promise.all([
     db.select().from(matches).where(eq(matches.stage, 'GROUP_STAGE')),
     db.select().from(specialPredictions).where(
       and(eq(specialPredictions.userId, session.userId), eq(specialPredictions.pollaId, polla.id))
     ),
     getPollaConfig(polla.id),
+    getMemberRole(polla.id, session.userId),
   ])
+
+  const isAdmin = myRole === 'admin'
+  const members = isAdmin
+    ? await db.select({ id: users.id, name: users.name })
+        .from(pollaMembers)
+        .innerJoin(users, eq(pollaMembers.userId, users.id))
+        .where(eq(pollaMembers.pollaId, polla.id))
+    : []
 
   const allTeams = Array.from(new Set([
     ...allMatches.map(m => m.team1),
@@ -39,11 +49,12 @@ export default async function PollaSpecialsPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-bold text-gradient-gold">Mis Pronósticos</h1>
+        <ImportPredictionsButton pollaId={polla.id} isAdmin={isAdmin} members={members} />
       </div>
 
-      <PredictionTabs active="specials" pollaSlug={slug} />
+      <PredictionTabs active="specials" pollaSlug={slug} showQuestions={config['feature_custom_questions'] === 'true'} />
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Predicciones Especiales</h2>

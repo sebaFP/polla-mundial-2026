@@ -90,8 +90,11 @@ export const groupPredictions = pgTable('group_predictions', {
   groupName: text('group_name').notNull(),
   firstPlace: text('first_place').notNull(),
   secondPlace: text('second_place').notNull(),
+  thirdPlace: text('third_place'),
   pointsFirst: integer('points_first'),
   pointsSecond: integer('points_second'),
+  pointsThird: integer('points_third'),
+  isManualOverride: boolean('is_manual_override').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => [unique().on(t.userId, t.groupName, t.pollaId)])
 
@@ -121,6 +124,17 @@ export const groupStandings = pgTable('group_standings', {
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.groupName, t.teamName)])
 
+// Admin-locked group standings — overrides computed 1st/2nd/3rd for scoring purposes
+export const groupStandingLocks = pgTable('group_standing_locks', {
+  id: serial('id').primaryKey(),
+  groupName: text('group_name').notNull().unique(),
+  firstPlace: text('first_place').notNull(),
+  secondPlace: text('second_place').notNull(),
+  thirdPlace: text('third_place'),
+  lockedAt: timestamp('locked_at').defaultNow(),
+  lockedBy: uuid('locked_by').references(() => users.id),
+})
+
 // Per-polla manual result overrides — takes precedence over API scores for that polla
 export const pollaResultOverrides = pgTable('polla_result_overrides', {
   id: serial('id').primaryKey(),
@@ -139,6 +153,39 @@ export const tournamentConfig = pgTable('tournament_config', {
   key: text('key').notNull(),
   value: text('value').notNull(),
 }, (t) => [unique().on(t.pollaId, t.key)])
+
+export const pollaQuestions = pgTable('polla_questions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pollaId: uuid('polla_id').notNull().references(() => pollas.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  type: text('type').notNull(), // 'team' | 'player' | 'range'
+  pointsValue: integer('points_value').default(5),
+  correctAnswer: text('correct_answer'),
+  enabled: boolean('enabled').default(true).notNull(),
+  order: integer('order').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
+export const pollaQuestionOptions = pgTable('polla_question_options', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  questionId: uuid('question_id').notNull().references(() => pollaQuestions.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  points: integer('points').default(3).notNull(),
+  isCorrect: boolean('is_correct').default(false).notNull(),
+  order: integer('order').default(0).notNull(),
+})
+
+export const pollaAnswers = pgTable('polla_answers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  pollaId: uuid('polla_id').notNull().references(() => pollas.id, { onDelete: 'cascade' }),
+  questionId: uuid('question_id').notNull().references(() => pollaQuestions.id, { onDelete: 'cascade' }),
+  answer: text('answer'),
+  optionId: uuid('option_id').references(() => pollaQuestionOptions.id, { onDelete: 'set null' }),
+  points: integer('points'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => [unique().on(t.userId, t.questionId, t.pollaId)])
 
 export const passwordResetRequests = pgTable('password_reset_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -171,3 +218,7 @@ export type SpecialPrediction = typeof specialPredictions.$inferSelect
 export type GroupStanding = typeof groupStandings.$inferSelect
 export type TournamentConfig = typeof tournamentConfig.$inferSelect
 export type PollaResultOverride = typeof pollaResultOverrides.$inferSelect
+export type PollaQuestion = typeof pollaQuestions.$inferSelect
+export type PollaQuestionOption = typeof pollaQuestionOptions.$inferSelect
+export type PollaAnswer = typeof pollaAnswers.$inferSelect
+export type GroupStandingLock = typeof groupStandingLocks.$inferSelect

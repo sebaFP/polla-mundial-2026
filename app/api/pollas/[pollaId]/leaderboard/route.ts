@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, predictions, groupPredictions, specialPredictions, pollaMembers } from '@/lib/db/schema'
+import { users, predictions, groupPredictions, specialPredictions, pollaMembers, pollaAnswers } from '@/lib/db/schema'
 import { eq, sql, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { getMemberRole, getPollaById } from '@/lib/polla'
@@ -13,6 +13,7 @@ export type LeaderboardEntry = {
   matchPoints: number
   groupPoints: number
   specialPoints: number
+  questionPoints: number
   totalPoints: number
   rank: number
   predictedMatches: number
@@ -77,17 +78,29 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       sql`(${pollaMembers.role} = 'participant' OR (${pollaMembers.role} = 'admin' AND ${pollaMembers.inscriptionStatus} = 'approved'))`
     ))
 
+  const questionPts = await db
+    .select({
+      userId: pollaAnswers.userId,
+      total: sql<number>`COALESCE(SUM(${pollaAnswers.points}), 0)`,
+    })
+    .from(pollaAnswers)
+    .where(eq(pollaAnswers.pollaId, pollaId))
+    .groupBy(pollaAnswers.userId)
+
   const matchMap = Object.fromEntries(matchPts.map(r => [r.userId, r]))
   const groupMap = Object.fromEntries(groupPts.map(r => [r.userId, r]))
   const specialMap = Object.fromEntries(specialPts.map(r => [r.userId, r]))
+  const questionMap = Object.fromEntries(questionPts.map(r => [r.userId, r]))
 
   const entries: LeaderboardEntry[] = members.map(m => {
     const mp = matchMap[m.userId]
     const gp = groupMap[m.userId]
     const sp = specialMap[m.userId]
+    const qp = questionMap[m.userId]
     const matchPoints = Number(mp?.total ?? 0)
     const groupPoints = Number(gp?.total ?? 0)
     const specialPoints = Number(sp?.total ?? 0)
+    const questionPoints = Number(qp?.total ?? 0)
     return {
       userId: m.userId,
       name: m.name,
@@ -96,7 +109,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       matchPoints,
       groupPoints,
       specialPoints,
-      totalPoints: matchPoints + groupPoints + specialPoints,
+      questionPoints,
+      totalPoints: matchPoints + groupPoints + specialPoints + questionPoints,
       rank: 0,
       predictedMatches: Number(mp?.predicted ?? 0),
       scoredMatches: Number(mp?.scored ?? 0),

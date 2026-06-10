@@ -5,7 +5,11 @@ import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { getMemberRole, isPollaOpen, getPollaById } from '@/lib/polla'
 
-const VALID_TYPES = ['champion', 'finalist', 'third', 'top_scorer', 'best_goalkeeper', 'best_player']
+const VALID_TYPES = [
+  'champion', 'finalist', 'third', 'top_scorer', 'best_goalkeeper', 'best_player',
+  'bonus_most_goals_team', 'bonus_most_conceded_team', 'bonus_red_cards_range',
+  'bonus_goals_range', 'bonus_penalties_range', 'bonus_group_top_scorer',
+]
 
 type RouteContext = { params: Promise<{ pollaId: string }> }
 

@@ -41,12 +41,15 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'La polla está cerrada temporalmente' }, { status: 403 })
   }
 
-  const { groupName, firstPlace, secondPlace } = await req.json()
+  const { groupName, firstPlace, secondPlace, thirdPlace } = await req.json()
   if (!groupName || !firstPlace || !secondPlace) {
     return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
   }
   if (firstPlace === secondPlace) {
     return NextResponse.json({ error: 'Primer y segundo lugar deben ser diferentes' }, { status: 400 })
+  }
+  if (thirdPlace && (thirdPlace === firstPlace || thirdPlace === secondPlace)) {
+    return NextResponse.json({ error: 'El tercer lugar debe ser diferente al 1° y 2°' }, { status: 400 })
   }
 
   const firstGroupMatch = await db.select().from(matches)
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   if (existing.length > 0) {
     const updated = await db.update(groupPredictions)
-      .set({ firstPlace, secondPlace })
+      .set({ firstPlace, secondPlace, thirdPlace: thirdPlace ?? null, isManualOverride: true })
       .where(eq(groupPredictions.id, existing[0].id))
       .returning()
     return NextResponse.json(updated[0])
@@ -83,6 +86,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     groupName,
     firstPlace,
     secondPlace,
+    thirdPlace: thirdPlace ?? null,
+    isManualOverride: true,
   }).returning()
 
   return NextResponse.json(created[0], { status: 201 })

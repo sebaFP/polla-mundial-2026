@@ -58,6 +58,7 @@ export default function PollaNav({
     { href: adminBase, label: 'Dashboard', icon: LayoutDashboard, exact: true },
     { href: `${adminBase}/participants`, label: 'Participantes', icon: Users },
     { href: `${adminBase}/results`, label: 'Resultados', icon: ClipboardList },
+    { href: `${adminBase}/questions`, label: 'Preguntas', icon: Target },
     { href: `${adminBase}/config`, label: 'Config', icon: Settings },
     { href: `${adminBase}/admins`, label: 'Admins', icon: ShieldCheck },
   ]

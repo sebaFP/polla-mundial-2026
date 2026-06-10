@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
-import { matches, predictions, groupStandings, groupPredictions, pollas, pollaResultOverrides } from '@/lib/db/schema'
-import { eq, and, sql, gte, lte } from 'drizzle-orm'
+import { matches, predictions, groupStandings, groupStandingLocks, groupPredictions, pollas, pollaResultOverrides } from '@/lib/db/schema'
+import { eq, and, sql, inArray } from 'drizzle-orm'
 import { getCompetitionMatches, isTeamResolved, type FDMatch } from './client'
 import { calcMatchPoints, calcGroupPoints } from '@/lib/scoring'
 import { getPollaConfig } from '@/lib/polla'
@@ -11,52 +11,56 @@ export type SyncResult = {
   errors: string[]
 }
 
-async function updateGroupStandings(groupName: string, team1: string, team2: string, score1: number, score2: number) {
-  const updateTeam = async (team: string, gf: number, ga: number, result: 'w' | 'd' | 'l') => {
-    const won = result === 'w' ? 1 : 0
-    const drawn = result === 'd' ? 1 : 0
-    const lost = result === 'l' ? 1 : 0
-    const pts = won * 3 + drawn
+export async function rebuildGroupStandings(groupName: string) {
+  const finishedMatches = await db.select().from(matches)
+    .where(and(
+      eq(matches.stage, 'GROUP_STAGE'),
+      eq(matches.groupName, groupName),
+      eq(matches.status, 'FINISHED'),
+    ))
 
-    const existing = await db.select().from(groupStandings)
-      .where(and(eq(groupStandings.groupName, groupName), eq(groupStandings.teamName, team)))
-      .limit(1)
+  type Stats = { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; pts: number }
+  const teamStats: Record<string, Stats> = {}
+  const init = (): Stats => ({ played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 })
 
-    if (existing.length === 0) {
-      await db.insert(groupStandings).values({
-        groupName,
-        teamName: team,
-        played: 1,
-        won,
-        drawn,
-        lost,
-        goalsFor: gf,
-        goalsAgainst: ga,
-        points: pts,
-      })
-    } else {
-      await db.update(groupStandings)
-        .set({
-          played: sql`${groupStandings.played} + 1`,
-          won: sql`${groupStandings.won} + ${won}`,
-          drawn: sql`${groupStandings.drawn} + ${drawn}`,
-          lost: sql`${groupStandings.lost} + ${lost}`,
-          goalsFor: sql`${groupStandings.goalsFor} + ${gf}`,
-          goalsAgainst: sql`${groupStandings.goalsAgainst} + ${ga}`,
-          points: sql`${groupStandings.points} + ${pts}`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(groupStandings.groupName, groupName), eq(groupStandings.teamName, team)))
+  for (const m of finishedMatches) {
+    if (m.score1 === null || m.score2 === null) continue
+    const s1 = m.score1, s2 = m.score2
+    if (!teamStats[m.team1]) teamStats[m.team1] = init()
+    if (!teamStats[m.team2]) teamStats[m.team2] = init()
+
+    const r1: 'w' | 'd' | 'l' = s1 > s2 ? 'w' : s1 === s2 ? 'd' : 'l'
+    const r2: 'w' | 'd' | 'l' = s2 > s1 ? 'w' : s1 === s2 ? 'd' : 'l'
+
+    const applyResult = (stats: Stats, gf: number, ga: number, r: 'w' | 'd' | 'l') => {
+      stats.played++
+      stats.gf += gf
+      stats.ga += ga
+      if (r === 'w') { stats.won++; stats.pts += 3 }
+      else if (r === 'd') { stats.drawn++; stats.pts += 1 }
+      else stats.lost++
     }
+    applyResult(teamStats[m.team1], s1, s2, r1)
+    applyResult(teamStats[m.team2], s2, s1, r2)
   }
 
-  const result1: 'w' | 'd' | 'l' = score1 > score2 ? 'w' : score1 === score2 ? 'd' : 'l'
-  const result2: 'w' | 'd' | 'l' = score2 > score1 ? 'w' : score1 === score2 ? 'd' : 'l'
+  await db.delete(groupStandings).where(eq(groupStandings.groupName, groupName))
 
-  await Promise.all([
-    updateTeam(team1, score1, score2, result1),
-    updateTeam(team2, score2, score1, result2),
-  ])
+  const rows = Object.entries(teamStats).map(([teamName, s]) => ({
+    groupName,
+    teamName,
+    played: s.played,
+    won: s.won,
+    drawn: s.drawn,
+    lost: s.lost,
+    goalsFor: s.gf,
+    goalsAgainst: s.ga,
+    points: s.pts,
+  }))
+
+  if (rows.length > 0) {
+    await db.insert(groupStandings).values(rows)
+  }
 }
 
 async function recalcMatchPredictions(matchId: number, apiScore1: number, apiScore2: number) {
@@ -84,9 +88,11 @@ async function recalcMatchPredictions(matchId: number, apiScore1: number, apiSco
   }
 }
 
-async function recalcGroupPredictions(groupName: string) {
-  const standings = await db.select().from(groupStandings)
-    .where(eq(groupStandings.groupName, groupName))
+export async function recalcGroupPredictions(groupName: string) {
+  const [standings, lock] = await Promise.all([
+    db.select().from(groupStandings).where(eq(groupStandings.groupName, groupName)),
+    db.select().from(groupStandingLocks).where(eq(groupStandingLocks.groupName, groupName)).limit(1),
+  ])
 
   const sorted = standings.sort((a, b) => {
     if ((b.points ?? 0) !== (a.points ?? 0)) return (b.points ?? 0) - (a.points ?? 0)
@@ -96,8 +102,16 @@ async function recalcGroupPredictions(groupName: string) {
     return (b.goalsFor ?? 0) - (a.goalsFor ?? 0)
   })
 
-  const actualFirst = sorted[0]?.teamName ?? ''
-  const actualSecond = sorted[1]?.teamName ?? ''
+  // Update position column in group_standings
+  for (let i = 0; i < sorted.length; i++) {
+    await db.update(groupStandings)
+      .set({ position: i + 1 })
+      .where(eq(groupStandings.id, sorted[i].id))
+  }
+
+  // Use locked values if present, otherwise computed standings
+  const actualFirst = lock[0]?.firstPlace ?? sorted[0]?.teamName ?? ''
+  const actualSecond = lock[0]?.secondPlace ?? sorted[1]?.teamName ?? ''
 
   const groupPreds = await db.select().from(groupPredictions)
     .where(eq(groupPredictions.groupName, groupName))
@@ -241,7 +255,7 @@ async function syncCompetition(
         await recalcMatchPredictions(upserted.id, newScore1, newScore2)
 
         if (upserted.stage === 'GROUP_STAGE' && upserted.groupName) {
-          await updateGroupStandings(upserted.groupName, upserted.team1, upserted.team2, newScore1, newScore2)
+          await rebuildGroupStandings(upserted.groupName)
           await recalcGroupPredictions(upserted.groupName)
         }
       }

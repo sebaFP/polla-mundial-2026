@@ -15,6 +15,7 @@ type Props = {
   initialPredictions: Prediction[]
   userId: string
   pollaId: string
+  knockoutMode?: string
 }
 
 type PredictionMap = Record<number, { s1: number | string; s2: number | string; saved: boolean; points?: number | null }>
@@ -35,7 +36,7 @@ function getStatusBadge(match: Match, locked: boolean) {
   return null
 }
 
-export default function MatchPredictions({ matches, initialPredictions, userId, pollaId }: Props) {
+export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api' }: Props) {
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [selectedGroup, setSelectedGroup] = useState<string>('')
   const [preds, setPreds] = useState<PredictionMap>(() => {
@@ -58,6 +59,30 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
   }, [matches])
 
   const activeGroup = selectedGroup && groups.includes(selectedGroup) ? selectedGroup : groups[0] ?? ''
+
+  const activeKnockoutStage = useMemo(() => {
+    if (knockoutMode !== 'sequential') return null
+    const knockoutStages = STAGE_ORDER.filter(s => s !== 'GROUP_STAGE')
+    for (const s of knockoutStages) {
+      const prevStage = s === 'LAST_32' ? 'GROUP_STAGE' : STAGE_ORDER[STAGE_ORDER.indexOf(s) - 1]
+      const prevMatches = matches.filter(m => m.stage === prevStage)
+      if (prevMatches.length === 0 || !prevMatches.every(m => m.status === 'FINISHED')) return null
+      const thisMatches = matches.filter(m => m.stage === s)
+      if (thisMatches.length === 0 || !thisMatches.every(m => m.status === 'FINISHED')) return s
+    }
+    return null
+  }, [matches, knockoutMode])
+
+  function isStageAccessible(s: string): boolean {
+    if (s === 'GROUP_STAGE') return true
+    if (knockoutMode !== 'sequential') return true
+    return s === activeKnockoutStage
+  }
+
+  function prevStageName(s: string): string {
+    const prevStage = s === 'LAST_32' ? 'GROUP_STAGE' : STAGE_ORDER[STAGE_ORDER.indexOf(s) - 1]
+    return STAGES[prevStage] ?? prevStage
+  }
 
   const visibleMatches = useMemo(() => {
     if (stage === 'GROUP_STAGE') {
@@ -102,17 +127,23 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
     <div className="space-y-4">
       {/* Stage selector */}
       <div className="flex flex-wrap gap-2">
-        {stages.map(s => (
-          <Button
-            key={s}
-            variant={stage === s ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStage(s)}
-            className="text-xs"
-          >
-            {STAGES[s] ?? s}
-          </Button>
-        ))}
+        {stages.map(s => {
+          const accessible = isStageAccessible(s)
+          return (
+            <Button
+              key={s}
+              variant={stage === s ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setStage(s)}
+              disabled={!accessible}
+              className={`text-xs ${!accessible ? 'opacity-40 cursor-not-allowed' : ''}`}
+              title={!accessible ? `Disponible cuando finalice ${prevStageName(s)}` : undefined}
+            >
+              {STAGES[s] ?? s}
+              {!accessible && <span className="ml-1">🔒</span>}
+            </Button>
+          )
+        })}
       </div>
 
       {/* Group selector for group stage */}
@@ -136,10 +167,18 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
 
       {/* Matches */}
       <div className="space-y-3">
-        {visibleMatches.length === 0 && (
+        {!isStageAccessible(stage) && (
+          <div className="text-center py-10 space-y-2">
+            <p className="text-3xl">🔒</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              Esta ronda se abre cuando finalice {prevStageName(stage)}
+            </p>
+          </div>
+        )}
+        {isStageAccessible(stage) && visibleMatches.length === 0 && (
           <p className="text-muted-foreground text-center py-8">No hay partidos disponibles aún</p>
         )}
-        {visibleMatches.map(match => {
+        {isStageAccessible(stage) && visibleMatches.map(match => {
           const locked = isLocked(match)
           const pred = preds[match.id]
           const isDirty = pred && !pred.saved

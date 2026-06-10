@@ -40,6 +40,7 @@ export default async function PollaAdminPage({ params }: { params: Promise<{ slu
     { href: `${base}/participants`, label: '👥 Participantes', value: Number(participants), description: 'Gestionar participantes y sus QR' },
     { href: `${base}/admins`, label: '🔐 Admins', value: Number(admins), description: 'Promover/remover administradores' },
     { href: `${base}/results`, label: '⚽ Resultados', value: null, description: 'Ingresar resultados manualmente' },
+    { href: `${base}/group-standings`, label: '🏆 Clasificación Grupos', value: null, description: 'Ver standings y fijar 1°/2°/3° por grupo' },
     { href: `${base}/config`, label: '⚙️ Config', value: null, description: 'Puntos, inscripción, pozo' },
   ]
 

@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { getMemberRole, getPollaById, getPollaConfig } from '@/lib/polla'
 import { calcMatchPoints } from '@/lib/scoring'
+import { rebuildGroupStandings, recalcGroupPredictions } from '@/lib/football-data/sync'
 
 type RouteContext = { params: Promise<{ pollaId: string; matchId: string }> }
 
@@ -45,6 +46,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     await db.update(predictions)
       .set({ points: pts, updatedAt: new Date() })
       .where(eq(predictions.id, pred.id))
+  }
+
+  // If GROUP_STAGE, rebuild standings and recalc group prediction points
+  const m = match[0]
+  if (m.stage === 'GROUP_STAGE' && m.groupName) {
+    await rebuildGroupStandings(m.groupName)
+    await recalcGroupPredictions(m.groupName)
   }
 
   return NextResponse.json({ ok: true, updated: preds.length })

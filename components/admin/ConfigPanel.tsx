@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { type RangeOption, RANGE_OPTION_DEFAULTS } from '@/lib/scoring'
 
 type Props = { initialConfig: Record<string, string>; pollaId?: string }
 
@@ -32,24 +33,39 @@ const SCORING_ITEMS: ConfigItem[] = [
 const GROUP_ITEMS: ConfigItem[] = [
   { key: 'points_group_winner', label: '1° Lugar del Grupo', description: 'Acierta el ganador del grupo', type: 'points', min: 0, max: 20 },
   { key: 'points_group_runner_up', label: '2° Lugar del Grupo', description: 'Acierta el segundo del grupo', type: 'points', min: 0, max: 15 },
+  { key: 'points_group_third_place', label: '3° Lugar del Grupo', description: 'Acierta el tercero del grupo', type: 'points', min: 0, max: 10 },
+]
+
+const BONUS_TYPE_LABELS: Record<string, string> = { team: '🏳️ Selección', player: '👤 Jugador', range: '📊 Rango' }
+type BonusConfigItem = {
+  featureKey: string; pointsKey: string; label: string; description: string; max: number
+  kind: 'team' | 'player' | 'range'
+  optionsKey?: string
+}
+const BONUS_CONFIG_ITEMS: BonusConfigItem[] = [
+  { featureKey: 'feature_top_scorer', pointsKey: 'points_top_scorer', label: 'Goleador del Torneo', description: '¿Quién será el máximo goleador del torneo?', max: 30, kind: 'player' },
+  { featureKey: 'feature_best_goalkeeper', pointsKey: 'points_best_goalkeeper', label: 'Mejor Arquero', description: '¿Quién será el mejor portero del torneo?', max: 30, kind: 'player' },
+  { featureKey: 'feature_best_player', pointsKey: 'points_best_player', label: 'Mejor Jugador (Balón de Oro)', description: '¿Quién será el jugador más destacado del torneo?', max: 30, kind: 'player' },
+  { featureKey: 'feature_bonus_most_goals_team', pointsKey: 'points_bonus_most_goals_team', label: 'Selección más goleadora', description: '¿Qué selección anota más goles en fase de grupos?', max: 20, kind: 'team' },
+  { featureKey: 'feature_bonus_most_conceded_team', pointsKey: 'points_bonus_most_conceded_team', label: 'Selección más goleada', description: '¿Qué selección recibe más goles en fase de grupos?', max: 15, kind: 'team' },
+  { featureKey: 'feature_bonus_red_cards_range', pointsKey: 'points_bonus_red_cards_range', label: 'Tarjetas rojas (rango)', description: '¿Cuántas tarjetas rojas habrá en fase de grupos?', max: 10, kind: 'range', optionsKey: 'options_bonus_red_cards_range' },
+  { featureKey: 'feature_bonus_goals_range', pointsKey: 'points_bonus_goals_range', label: 'Total de goles (rango)', description: '¿Cuántos goles se anotarán en fase de grupos?', max: 10, kind: 'range', optionsKey: 'options_bonus_goals_range' },
+  { featureKey: 'feature_bonus_penalties_range', pointsKey: 'points_bonus_penalties_range', label: 'Penales (rango)', description: '¿Cuántos penales se cobrarán en fase de grupos?', max: 10, kind: 'range', optionsKey: 'options_bonus_penalties_range' },
+  { featureKey: 'feature_bonus_group_top_scorer', pointsKey: 'points_bonus_group_top_scorer', label: 'Goleador fase de grupos', description: '¿Quién anota más goles en fase de grupos?', max: 20, kind: 'range', optionsKey: 'options_bonus_group_top_scorer' },
 ]
 
 const SPECIAL_ITEMS: ConfigItem[] = [
   { key: 'points_champion', label: 'Campeón del Mundo', description: 'Acierta el campeón del torneo', type: 'points', min: 0, max: 50 },
   { key: 'points_finalist', label: 'Finalista (perdedor)', description: 'Acierta el finalista que pierde', type: 'points', min: 0, max: 30 },
   { key: 'points_third_place', label: '3° Lugar', description: 'Acierta el ganador del tercer puesto', type: 'points', min: 0, max: 20 },
-  { key: 'points_top_scorer', label: 'Goleador del Torneo', description: 'Acierta el máximo goleador', type: 'points', min: 0, max: 30 },
-  { key: 'points_best_goalkeeper', label: 'Mejor Arquero', description: 'Acierta el mejor portero del torneo', type: 'points', min: 0, max: 30 },
-  { key: 'points_best_player', label: 'Mejor Jugador (Balón de Oro)', description: 'Acierta el jugador más destacado', type: 'points', min: 0, max: 30 },
 ]
 
 const FEATURE_ITEMS: ConfigItem[] = [
   { key: 'polla_open', label: 'Polla Abierta', description: 'Cuando está cerrada, los participantes no pueden enviar pronósticos', type: 'toggle' },
   { key: 'feature_group_predictions', label: 'Pronósticos de Grupos', description: 'Permitir predecir clasificados por grupo', type: 'toggle' },
   { key: 'feature_special_predictions', label: 'Predicciones Especiales', description: 'Permitir campeón, finalista, etc.', type: 'toggle' },
-  { key: 'feature_top_scorer', label: 'Goleador del Torneo', description: 'Incluir predicción de máximo goleador', type: 'toggle' },
-  { key: 'feature_best_goalkeeper', label: 'Mejor Arquero', description: 'Incluir predicción de mejor portero', type: 'toggle' },
-  { key: 'feature_best_player', label: 'Mejor Jugador', description: 'Incluir predicción de mejor jugador (Balón de Oro)', type: 'toggle' },
+  { key: 'feature_bonus_predictions', label: 'Preguntas Bonus & Premios Individuales', description: 'Goleador, mejor arquero, mejor jugador y preguntas de la planilla del Mundial', type: 'toggle' },
+  { key: 'feature_custom_questions', label: 'Preguntas Personalizadas', description: 'Preguntas creadas por el admin de la polla (gestionar en Configuración → Preguntas)', type: 'toggle' },
 ]
 
 const LOCK_ITEMS: ConfigItem[] = [
@@ -62,6 +78,69 @@ const TABS = [
   { id: 'inscription', label: '📝 Inscripción' },
   { id: 'prizes', label: '🏆 Premios' },
 ]
+
+function OptionsEditor({
+  optionsKey,
+  config,
+  update,
+}: {
+  optionsKey: string
+  config: Record<string, string>
+  update: (key: string, value: string | number | boolean) => void
+}) {
+  function getOptions(): RangeOption[] {
+    const stored = config[optionsKey]
+    if (stored) {
+      try { return JSON.parse(stored) as RangeOption[] } catch { /* */ }
+    }
+    return RANGE_OPTION_DEFAULTS[optionsKey] ?? []
+  }
+
+  const options = getOptions()
+
+  function setOptions(next: RangeOption[]) {
+    update(optionsKey, JSON.stringify(next))
+  }
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="text-xs text-muted-foreground font-medium">Opciones de respuesta:</p>
+      {options.map((opt, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            value={opt.label}
+            onChange={e => {
+              const next = options.map((o, j) => j === i ? { ...o, label: e.target.value } : o)
+              setOptions(next)
+            }}
+            placeholder="Etiqueta..."
+            className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+          />
+          <input
+            type="number"
+            value={opt.points}
+            min={0}
+            max={99}
+            onChange={e => {
+              const next = options.map((o, j) => j === i ? { ...o, points: parseInt(e.target.value) || 0 } : o)
+              setOptions(next)
+            }}
+            className="w-14 px-2 py-1 text-xs rounded-md bg-input border border-border text-center text-foreground"
+          />
+          <span className="text-xs text-muted-foreground shrink-0">pts</span>
+          <button
+            onClick={() => setOptions(options.filter((_, j) => j !== i))}
+            className="text-muted-foreground hover:text-destructive transition-colors text-sm leading-none shrink-0"
+          >✕</button>
+        </div>
+      ))}
+      <button
+        onClick={() => setOptions([...options, { label: '', points: 5 }])}
+        className="text-xs text-primary hover:text-primary/80 transition-colors"
+      >+ Agregar opción</button>
+    </div>
+  )
+}
 
 function PointsSlider({ item, value, onChange }: { item: ConfigItem; value: number; onChange: (v: number) => void }) {
   const unit = item.unit ?? 'pts'
@@ -213,6 +292,42 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
             </CardContent>
           </Card>
 
+          {config.feature_bonus_predictions === 'true' && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm">🎯 Preguntas Bonus & Premios Individuales</CardTitle>
+                <CardDescription className="text-xs">Activa cada pregunta y configura sus puntos</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {BONUS_CONFIG_ITEMS.map(item => (
+                  <div key={item.featureKey} className="space-y-3 pb-4 border-b border-border last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium">{item.label}</p>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium leading-none">{BONUS_TYPE_LABELS[item.kind]}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                      <Switch checked={config[item.featureKey] === 'true'} onCheckedChange={v => update(item.featureKey, v)} />
+                    </div>
+                    {config[item.featureKey] === 'true' && (
+                      item.kind === 'range' && item.optionsKey ? (
+                        <OptionsEditor optionsKey={item.optionsKey} config={config} update={update} />
+                      ) : (
+                        <PointsSlider
+                          item={{ key: item.pointsKey, label: 'Puntos si acierta', description: '', type: 'points', min: 0, max: item.max }}
+                          value={parseInt(config[item.pointsKey] ?? '0')}
+                          onChange={v => update(item.pointsKey, v)}
+                        />
+                      )
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="text-sm">⏰ Tiempo de Cierre</CardTitle>
@@ -221,6 +336,43 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
               {LOCK_ITEMS.map(item => (
                 <PointsSlider key={item.key} item={item} value={parseInt(config[item.key] ?? '15')} onChange={v => update(item.key, v)} />
               ))}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-sm">🏆 Eliminación Directa</CardTitle>
+              <CardDescription className="text-xs">Controla cuándo se abren los pronósticos de cada ronda</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { value: 'api', label: 'Automático (API)', desc: 'Se abren cuando la API confirma los equipos de cada cruce' },
+                  { value: 'sequential', label: 'Nivel por nivel', desc: 'Cada ronda se abre solo cuando todos los partidos de la ronda anterior finalizan' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      (config.knockout_prediction_mode ?? 'api') === opt.value
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="knockout_prediction_mode"
+                      value={opt.value}
+                      checked={(config.knockout_prediction_mode ?? 'api') === opt.value}
+                      onChange={() => update('knockout_prediction_mode', opt.value)}
+                      className="mt-0.5 accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </CardContent>
           </Card>
 
