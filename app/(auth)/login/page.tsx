@@ -22,6 +22,28 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false)
   const [resetSent, setResetSent] = useState(false)
 
+  // Self-service link flow
+  const [linkLoading, setLinkLoading] = useState(false)
+  const [linkSent, setLinkSent] = useState(false)
+
+  async function handleSendLink(e: React.FormEvent) {
+    e.preventDefault()
+    setLinkLoading(true)
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail }),
+      })
+      // Always show success (don't leak whether email exists)
+      setLinkSent(true)
+    } catch {
+      toast.error('Error de conexión')
+    } finally {
+      setLinkLoading(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -156,30 +178,28 @@ export default function LoginPage() {
           <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
             <CardHeader>
               <CardTitle className="text-xl font-bold">Recuperar contraseña</CardTitle>
-              <CardDescription>
-                Tu solicitud llegará al administrador, quien restablecerá tu contraseña.
-              </CardDescription>
+              <CardDescription>Elige cómo quieres recuperar tu acceso</CardDescription>
             </CardHeader>
-            <CardContent>
-              {resetSent ? (
-                <div className="space-y-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Solicitud enviada. El administrador revisará tu mensaje y restablecerá tu contraseña pronto.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => { setShowReset(false); setResetSent(false) }}
-                  >
-                    Volver al inicio de sesión
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetRequest} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email de tu cuenta</Label>
+            <CardContent className="space-y-6">
+              {/* Option 1: self-service link */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Recibir link por email</p>
+                {linkSent ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Si existe una cuenta con ese email, recibirás un link para restablecer tu contraseña. El link expira en 1 hora.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => { setShowReset(false); setLinkSent(false) }}
+                    >
+                      Volver al inicio de sesión
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendLink} className="space-y-3">
                     <Input
-                      id="reset-email"
                       type="email"
                       placeholder="tu@email.com"
                       value={resetEmail}
@@ -187,36 +207,75 @@ export default function LoginPage() {
                       required
                       autoComplete="email"
                     />
+                    <Button
+                      type="submit"
+                      className="w-full font-bold tracking-wide"
+                      disabled={linkLoading || !resetEmail}
+                    >
+                      {linkLoading ? 'Enviando...' : 'ENVIAR LINK'}
+                    </Button>
+                  </form>
+                )}
+              </div>
+
+              {!linkSent && (
+                <>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">o</span>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-message">Mensaje para el administrador</Label>
-                    <Textarea
-                      id="reset-message"
-                      placeholder="Cuéntale al admin quién eres y por qué necesitas recuperar tu contraseña..."
-                      value={resetMessage}
-                      onChange={e => setResetMessage(e.target.value)}
-                      required
-                      minLength={10}
-                      rows={4}
-                      className="resize-none"
-                    />
+
+                  {/* Option 2: request to admin */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Solicitar al administrador</p>
+                    {resetSent ? (
+                      <p className="text-sm text-muted-foreground">
+                        Solicitud enviada. El administrador restablecerá tu contraseña pronto.
+                      </p>
+                    ) : (
+                      <form onSubmit={handleResetRequest} className="space-y-3">
+                        <Input
+                          type="email"
+                          placeholder="tu@email.com"
+                          value={resetEmail}
+                          onChange={e => setResetEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                        />
+                        <Textarea
+                          placeholder="Cuéntale al admin quién eres y por qué necesitas recuperar tu contraseña..."
+                          value={resetMessage}
+                          onChange={e => setResetMessage(e.target.value)}
+                          required
+                          minLength={10}
+                          rows={3}
+                          className="resize-none"
+                        />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="w-full font-bold tracking-wide"
+                          disabled={resetLoading || resetMessage.length < 10}
+                        >
+                          {resetLoading ? 'Enviando...' : 'ENVIAR SOLICITUD'}
+                        </Button>
+                      </form>
+                    )}
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full font-bold tracking-wide"
-                    disabled={resetLoading || resetMessage.length < 10}
-                  >
-                    {resetLoading ? 'Enviando...' : 'ENVIAR SOLICITUD'}
-                  </Button>
-                  <button
-                    type="button"
-                    className="w-full text-xs text-muted-foreground hover:text-primary transition-colors text-center"
-                    onClick={() => setShowReset(false)}
-                  >
-                    Volver al inicio de sesión
-                  </button>
-                </form>
+                </>
               )}
+
+              <button
+                type="button"
+                className="w-full text-xs text-muted-foreground hover:text-primary transition-colors text-center"
+                onClick={() => { setShowReset(false); setResetSent(false); setLinkSent(false) }}
+              >
+                Volver al inicio de sesión
+              </button>
             </CardContent>
           </Card>
         )}

@@ -151,6 +151,15 @@ export const passwordResetRequests = pgTable('password_reset_requests', {
   resolvedById: uuid('resolved_by_id').references(() => users.id),
 })
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: uuid('token').notNull().unique().defaultRandom(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
 export type User = typeof users.$inferSelect
 export type Polla = typeof pollas.$inferSelect
 export type PollaMember = typeof pollaMembers.$inferSelect

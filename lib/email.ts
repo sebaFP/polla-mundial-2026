@@ -54,6 +54,38 @@ export async function sendResetRequestNotification({
   })
 }
 
+export async function sendPasswordResetLink({
+  toEmail,
+  toName,
+  resetLink,
+}: {
+  toEmail: string
+  toName: string
+  resetLink: string
+}) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return
+
+  await transporter.sendMail({
+    from: FROM,
+    to: toEmail,
+    subject: 'Restablece tu contraseña — Polla Mundial 2026',
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#c9a227">Polla Mundial 2026</h2>
+        <p>Hola <strong>${toName}</strong>,</p>
+        <p>Recibimos una solicitud para restablecer tu contraseña. Haz clic en el botón para crear una nueva:</p>
+        <div style="text-align:center;margin:24px 0">
+          <a href="${resetLink}" style="background:#c9a227;color:#0a0a1a;padding:12px 28px;border-radius:8px;font-weight:bold;text-decoration:none;font-size:16px;display:inline-block">
+            Restablecer contraseña
+          </a>
+        </div>
+        <p style="color:#888;font-size:13px">Este link expira en <strong>1 hora</strong>. Si no solicitaste esto, ignora este mensaje — tu contraseña no cambiará.</p>
+        <p style="color:#555;font-size:12px;word-break:break-all">O copia este link: ${resetLink}</p>
+      </div>
+    `,
+  })
+}
+
 export async function sendTempPassword({
   toEmail,
   toName,
