@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'La polla está cerrada temporalmente' }, { status: 403 })
   }
 
-  const { matchId, predictedScore1, predictedScore2 } = await req.json()
+  const { matchId, predictedScore1, predictedScore2, targetUserId } = await req.json()
   if (typeof matchId !== 'number' || typeof predictedScore1 !== 'number' || typeof predictedScore2 !== 'number') {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
   }
@@ -52,10 +52,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Marcador inválido' }, { status: 400 })
   }
 
+  // Admin can edit any user's predictions, bypassing all lock checks
+  const isAdminEdit = myRole === 'admin' && typeof targetUserId === 'string' && targetUserId !== session.userId
+  const effectiveUserId = isAdminEdit ? targetUserId : session.userId
+
   const [match, pollaConfig, unlocked] = await Promise.all([
     db.select().from(matches).where(eq(matches.id, matchId)).limit(1),
     getPollaConfig(pollaId),
-    isMemberPredictionUnlocked(pollaId, session.userId),
+    isAdminEdit ? Promise.resolve(true) : isMemberPredictionUnlocked(pollaId, session.userId),
   ])
   if (match.length === 0) return NextResponse.json({ error: 'Partido no encontrado' }, { status: 404 })
 
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         const prevStage = stageOrder[idx - 1]
         const prevMatches = await db.select({ status: matches.status }).from(matches).where(eq(matches.stage, prevStage))
         const allFinished = prevMatches.length > 0 && prevMatches.every(m => m.status === 'FINISHED')
-        if (!allFinished) {
+        if (!allFinished && !isAdminEdit) {
           return NextResponse.json({ error: 'Esta ronda aún no está disponible' }, { status: 403 })
         }
       }
@@ -102,7 +106,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const existing = await db.select().from(predictions)
     .where(and(
-      eq(predictions.userId, session.userId),
+      eq(predictions.userId, effectiveUserId),
       eq(predictions.matchId, matchId),
       eq(predictions.pollaId, pollaId),
     ))
@@ -115,14 +119,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .returning()
 
     if (match[0].stage === 'GROUP_STAGE' && match[0].groupName) {
-      await autoFillGroupPrediction(pollaId, session.userId, match[0].groupName)
+      await autoFillGroupPrediction(pollaId, effectiveUserId, match[0].groupName)
     }
 
     return NextResponse.json(updated[0])
   }
 
   const created = await db.insert(predictions).values({
-    userId: session.userId,
+    userId: effectiveUserId,
     pollaId,
     matchId,
     predictedScore1,
@@ -130,7 +134,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }).returning()
 
   if (match[0].stage === 'GROUP_STAGE' && match[0].groupName) {
-    await autoFillGroupPrediction(pollaId, session.userId, match[0].groupName)
+    await autoFillGroupPrediction(pollaId, effectiveUserId, match[0].groupName)
   }
 
   return NextResponse.json(created[0], { status: 201 })

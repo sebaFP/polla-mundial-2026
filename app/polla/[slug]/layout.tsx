@@ -3,7 +3,7 @@ import { getPollaBySlug, getMemberRole } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import PollaNav from '@/components/PollaNav'
 import { db } from '@/lib/db'
-import { passwordResetRequests } from '@/lib/db/schema'
+import { passwordResetRequests, pollaMembers } from '@/lib/db/schema'
 import { eq, count } from 'drizzle-orm'
 
 export default async function PollaLayout({
@@ -32,6 +32,11 @@ export default async function PollaLayout({
     pendingResetCount = value
   }
 
+  const [{ value: pollaCount }] = await db
+    .select({ value: count() })
+    .from(pollaMembers)
+    .where(eq(pollaMembers.userId, session.userId))
+
   return (
     <div className="relative min-h-screen gradient-bg overflow-x-hidden">
       <div className="pattern-geo absolute inset-0" aria-hidden />
@@ -43,6 +48,7 @@ export default async function PollaLayout({
           myRole={myRole}
           isSuperAdmin={session.isSuperAdmin}
           pendingResetCount={pendingResetCount}
+          pollaCount={pollaCount}
         />
         <main className="container mx-auto px-4 py-6 max-w-6xl">
           {children}

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   Menu, Link2, LayoutDashboard, Users, ClipboardList,
-  Settings, ShieldCheck, Eye, Target, LayoutGrid, Star, Trophy, Radio,
+  Settings, ShieldCheck, Eye, Target, LayoutGrid, Star, Trophy, Radio, ChevronLeft,
 } from 'lucide-react'
 
 function Wordmark({ onClick }: { onClick?: () => void }) {
@@ -32,6 +32,7 @@ export default function PollaNav({
   myRole,
   isSuperAdmin = false,
   pendingResetCount = 0,
+  pollaCount = 1,
 }: {
   userName: string
   pollaName: string
@@ -39,6 +40,7 @@ export default function PollaNav({
   myRole: 'admin' | 'participant'
   isSuperAdmin?: boolean
   pendingResetCount?: number
+  pollaCount?: number
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -159,6 +161,15 @@ export default function PollaNav({
 
             {/* Desktop user */}
             <div className="hidden sm:flex items-center gap-2 shrink-0">
+              {pollaCount > 1 && (
+                <Link
+                  href="/"
+                  className="px-2 py-1 rounded text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Mis Pollas
+                </Link>
+              )}
               <span className="text-xs text-muted-foreground truncate max-w-24">{userName}</span>
               {!isOnAdmin && (
                 <Button variant="ghost" size="sm" onClick={copyJoinLink} className="text-xs text-muted-foreground hover:text-foreground gap-1.5">
@@ -313,6 +324,19 @@ export default function PollaNav({
                       Contraseña
                     </SheetClose>
                   </div>
+                  {pollaCount > 1 && (
+                    <SheetClose
+                      render={
+                        <Link
+                          href="/"
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                        />
+                      }
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
+                      Mis Pollas
+                    </SheetClose>
+                  )}
                 </div>
 
               </SheetContent>

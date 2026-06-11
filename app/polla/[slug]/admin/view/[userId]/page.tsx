@@ -8,10 +8,11 @@ import { getSession } from '@/lib/auth/session'
 import { getPollaBySlug, getMemberRole, getPollaConfig } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getFlag, STAGES, STAGE_ORDER } from '@/lib/teams'
+import { getFlag } from '@/lib/teams'
 import { ChevronLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import AdminMatchPredictions from '@/components/admin/AdminMatchPredictions'
 
 export const revalidate = 0
 
@@ -54,14 +55,6 @@ export default async function AdminViewParticipantPage({
   ])
 
   if (!targetUser) redirect(`/polla/${slug}/admin/participants`)
-
-  const predMap = Object.fromEntries(userPreds.map(p => [p.matchId, p]))
-
-  // Group matches by stage
-  const matchesByStage: Record<string, typeof allMatches> = {}
-  for (const m of allMatches) {
-    ;(matchesByStage[m.stage] ??= []).push(m)
-  }
 
   // Questions
   let questionsWithAnswers: Array<{
@@ -111,65 +104,22 @@ export default async function AdminViewParticipantPage({
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gradient-gold">{targetUser.name}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Vista de pronósticos — {totalPoints} pts totales</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{totalPoints} pts totales · {userPreds.length}/{allMatches.length} partidos</p>
         </div>
       </div>
 
-      {/* Match predictions */}
-      <div className="space-y-4">
-        <h2 className="text-base font-semibold">Partidos ({userPreds.length} de {allMatches.length})</h2>
-        {STAGE_ORDER.filter(s => matchesByStage[s]?.length).map(stage => (
-          <div key={stage} className="space-y-1.5">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold px-1">
-              {STAGES[stage] ?? stage}
-            </p>
-            {matchesByStage[stage].map(m => {
-              const pred = predMap[m.id]
-              const hasResult = m.score1 !== null && m.score2 !== null
-              return (
-                <Card key={m.id} className="glass-card px-3 py-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="flex-1 flex items-center gap-1.5 justify-end">
-                      <span className="font-medium truncate">{getFlag(m.team1)} {m.team1}</span>
-                    </div>
-                    <div className="shrink-0 text-center min-w-[80px]">
-                      {pred ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <span className={`font-bold tabular-nums ${
-                            pred.points !== null && pred.points > 0 ? 'text-primary' : ''
-                          }`}>
-                            {pred.predictedScore1} – {pred.predictedScore2}
-                          </span>
-                          {pred.points !== null && (
-                            <Badge className="text-[10px] px-1 py-0 bg-primary/15 text-primary border-primary/30">
-                              +{pred.points}
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                      {hasResult && (
-                        <p className="text-[10px] text-muted-foreground tabular-nums">
-                          ({m.score1}–{m.score2})
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-1 flex items-center gap-1.5">
-                      <span className="font-medium truncate">{getFlag(m.team2)} {m.team2}</span>
-                    </div>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
-        ))}
-        {userPreds.length === 0 && (
-          <p className="text-muted-foreground text-sm text-center py-4">Sin pronósticos de partidos</p>
-        )}
+      {/* Match predictions — editable */}
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold">Partidos</h2>
+        <AdminMatchPredictions
+          matches={allMatches}
+          initialPredictions={userPreds}
+          targetUserId={userId}
+          pollaId={polla.id}
+        />
       </div>
 
-      {/* Group predictions */}
+      {/* Group predictions — read-only */}
       {featGroups && (
         <div className="space-y-3">
           <h2 className="text-base font-semibold">Grupos ({userGroupPreds.length} de 12)</h2>
@@ -202,7 +152,7 @@ export default async function AdminViewParticipantPage({
         </div>
       )}
 
-      {/* Special predictions */}
+      {/* Special predictions — read-only */}
       {featSpecials && (
         <div className="space-y-3">
           <h2 className="text-base font-semibold">Especiales ({userSpecials.length})</h2>
@@ -230,7 +180,7 @@ export default async function AdminViewParticipantPage({
         </div>
       )}
 
-      {/* Custom questions */}
+      {/* Custom questions — read-only */}
       {featQuestions && (
         <div className="space-y-3">
           <h2 className="text-base font-semibold">
