@@ -89,7 +89,7 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
   const [showLiveGroups, setShowLiveGroups] = useState(false)
 
   const hasLiveMatches = entries.some(e => e.livePoints > 0)
-  const hasLiveGroups = entries.some(e => e.liveGroupPoints > 0)
+  const hasLiveGroups = entries.some(e => e.hasLiveGroups)
 
   const displayEntries = useMemo(() => {
     const livePts = (e: LeaderboardEntry) =>

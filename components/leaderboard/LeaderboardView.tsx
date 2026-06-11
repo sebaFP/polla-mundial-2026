@@ -122,7 +122,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
   }, [])
 
   const hasLiveMatches = entries.some(e => e.livePoints > 0)
-  const hasLiveGroups = entries.some(e => e.liveGroupPoints > 0)
+  const hasLiveGroups = entries.some(e => e.hasLiveGroups)
 
   const displayEntries = useMemo(() => {
     const livePts = (e: LeaderboardEntry) =>
