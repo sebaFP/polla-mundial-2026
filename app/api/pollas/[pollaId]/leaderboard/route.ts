@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users, predictions, groupPredictions, specialPredictions, pollaMembers, pollaAnswers, matches, pollaResultOverrides } from '@/lib/db/schema'
+import { users, predictions, groupPredictions, specialPredictions, pollaMembers, pollaAnswers, matches, pollaResultOverrides, groupStandings, groupStandingLocks } from '@/lib/db/schema'
 import { eq, sql, and, inArray } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
 import { getMemberRole, getPollaById, getPollaConfig } from '@/lib/polla'
@@ -14,6 +14,7 @@ export type LeaderboardEntry = {
   matchPoints: number       // confirmed (synced FINISHED)
   pendingPoints: number     // FINISHED but sync hasn't run yet
   livePoints: number        // IN_PLAY / PAUSED current score
+  liveGroupPoints: number   // tentative group prediction points (groups not yet locked)
   groupPoints: number
   specialPoints: number
   questionPoints: number
@@ -22,6 +23,7 @@ export type LeaderboardEntry = {
   predictedMatches: number
   scoredMatches: number
   hasLiveMatches: boolean
+  hasLiveGroups: boolean
 }
 
 type RouteContext = { params: Promise<{ pollaId: string }> }
@@ -102,13 +104,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const livePtsMap: Record<string, number> = {}
   let hasLive = false
 
+  const config = await getPollaConfig(pollaId)
+
   if (activeMatchIds.length > 0) {
-    const [livePreds, config, overrides] = await Promise.all([
+    const [livePreds, overrides] = await Promise.all([
       db.select().from(predictions).where(and(
         eq(predictions.pollaId, pollaId),
         inArray(predictions.matchId, activeMatchIds),
       )),
-      getPollaConfig(pollaId),
       db.select().from(pollaResultOverrides).where(and(
         eq(pollaResultOverrides.pollaId, pollaId),
         inArray(pollaResultOverrides.matchId, activeMatchIds),
@@ -140,6 +143,49 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     }
   }
 
+  // --- Live group prediction points ---
+  // For groups not yet locked (finalized), compute tentative 1st/2nd from current standings
+  const [locks, standings, allGroupPreds] = await Promise.all([
+    db.select().from(groupStandingLocks),
+    db.select().from(groupStandings),
+    db.select().from(groupPredictions).where(eq(groupPredictions.pollaId, pollaId)),
+  ])
+  const lockedGroups = new Set(locks.map(l => l.groupName))
+  const ptGroupWinner = parseInt(config.points_group_winner ?? '6') || 6
+  const ptGroupRunnerUp = parseInt(config.points_group_runner_up ?? '4') || 4
+
+  // Build current 1st/2nd per unlocked group from standings (sorted by position)
+  const currentGroupLeaders: Record<string, { first: string; second: string }> = {}
+  const byGroup: Record<string, typeof standings> = {}
+  for (const s of standings) {
+    if (!byGroup[s.groupName]) byGroup[s.groupName] = []
+    byGroup[s.groupName].push(s)
+  }
+  for (const [group, rows] of Object.entries(byGroup)) {
+    if (lockedGroups.has(group)) continue
+    const sorted = rows.slice().sort((a, b) => (a.position ?? 99) - (b.position ?? 99))
+    if (sorted.length >= 2 && sorted[0].played && sorted[0].played > 0) {
+      currentGroupLeaders[group] = { first: sorted[0].teamName, second: sorted[1].teamName }
+    }
+  }
+
+  const liveGroupPtsMap: Record<string, number> = {}
+  let hasLiveGroups = Object.keys(currentGroupLeaders).length > 0
+
+  for (const pred of allGroupPreds) {
+    if (lockedGroups.has(pred.groupName)) continue
+    // Already scored → skip (will be in groupPoints)
+    if (pred.pointsFirst !== null && pred.pointsFirst !== undefined) continue
+    const leaders = currentGroupLeaders[pred.groupName]
+    if (!leaders) continue
+    let tentative = 0
+    if (pred.firstPlace === leaders.first) tentative += ptGroupWinner
+    if (pred.secondPlace === leaders.second) tentative += ptGroupRunnerUp
+    if (tentative > 0) {
+      liveGroupPtsMap[pred.userId] = (liveGroupPtsMap[pred.userId] ?? 0) + tentative
+    }
+  }
+
   const matchMap2 = Object.fromEntries(matchPts.map(r => [r.userId, r]))
   const groupMap = Object.fromEntries(groupPts.map(r => [r.userId, r]))
   const specialMap = Object.fromEntries(specialPts.map(r => [r.userId, r]))
@@ -153,6 +199,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const matchPoints = Number(mp?.total ?? 0)
     const pendingPoints = pendingPtsMap[m.userId] ?? 0
     const livePoints = livePtsMap[m.userId] ?? 0
+    const liveGroupPoints = liveGroupPtsMap[m.userId] ?? 0
     const groupPoints = Number(gp?.total ?? 0)
     const specialPoints = Number(sp?.total ?? 0)
     const questionPoints = Number(qp?.total ?? 0)
@@ -164,15 +211,17 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       matchPoints,
       pendingPoints,
       livePoints,
+      liveGroupPoints,
       groupPoints,
       specialPoints,
       questionPoints,
       // Rank by confirmed + pending + live so ranking moves during matches
-      totalPoints: matchPoints + pendingPoints + livePoints + groupPoints + specialPoints + questionPoints,
+      totalPoints: matchPoints + pendingPoints + livePoints + liveGroupPoints + groupPoints + specialPoints + questionPoints,
       rank: 0,
       predictedMatches: Number(mp?.predicted ?? 0),
       scoredMatches: Number(mp?.scored ?? 0),
       hasLiveMatches: hasLive,
+      hasLiveGroups,
     }
   })
 

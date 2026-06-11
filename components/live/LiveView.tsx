@@ -87,8 +87,7 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
 function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string }) {
   const [showLive, setShowLive] = useState(true)
 
-  if (entries.length === 0) return null
-  const hasLiveData = entries.some(e => e.livePoints > 0)
+  const hasLiveData = entries.some(e => e.livePoints > 0 || e.liveGroupPoints > 0)
 
   const displayEntries = useMemo(() => {
     if (showLive || !hasLiveData) return entries
@@ -100,6 +99,8 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
     sorted.forEach((e, i) => { e.rank = i + 1 })
     return sorted
   }, [entries, showLive, hasLiveData])
+
+  if (entries.length === 0) return null
 
   return (
     <div className="space-y-1.5">
@@ -128,7 +129,7 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
           </button>
         </div>
       )}
-      {showLive && entries.some(e => e.hasLiveMatches) && (
+      {showLive && entries.some(e => e.hasLiveMatches || e.hasLiveGroups) && (
         <div className="flex items-center gap-1.5 px-1 mb-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
           <span className="text-xs text-yellow-300/70">Clasificación provisional · puntos en juego pueden cambiar</span>
@@ -137,7 +138,7 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
       {displayEntries.map(entry => {
         const isMe = entry.userId === userId
         const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-        const displayPts = showLive ? confirmedPts + entry.livePoints : confirmedPts
+        const displayPts = showLive ? confirmedPts + entry.livePoints + entry.liveGroupPoints : confirmedPts
         return (
           <div
             key={entry.userId}
@@ -160,10 +161,10 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
             </span>
             <div className="text-right shrink-0">
               <span className="font-black text-primary font-mono text-sm leading-none">{displayPts}</span>
-              {showLive && entry.livePoints > 0 ? (
+              {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) ? (
                 <div className="flex items-center justify-end gap-1 mt-0.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-                  <span className="text-xs font-bold text-yellow-400">+{entry.livePoints}</span>
+                  <span className="text-xs font-bold text-yellow-400">+{entry.livePoints + entry.liveGroupPoints}</span>
                 </div>
               ) : (
                 <span className="block text-xs text-muted-foreground">pts</span>
@@ -179,7 +180,7 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
 export default function LiveView({ initialMatches, initialPredictions, initialLeaderboard, userId, pollaId }: Props) {
   const [liveMatches, setLiveMatches] = useState<Match[]>(initialMatches)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(initialLeaderboard)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     async function poll() {
@@ -275,8 +276,8 @@ export default function LiveView({ initialMatches, initialPredictions, initialLe
               </span>
             )}
           </div>
-          <span className="text-xs text-muted-foreground/60">
-            {format(lastUpdated, 'HH:mm:ss')}
+          <span className="text-xs text-muted-foreground/60" suppressHydrationWarning>
+            {lastUpdated ? format(lastUpdated, 'HH:mm:ss') : ''}
           </span>
         </div>
         <MiniLeaderboard entries={leaderboard} userId={userId} />

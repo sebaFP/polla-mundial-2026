@@ -56,8 +56,8 @@ function Podium({ entries, showLive }: { entries: LeaderboardEntry[]; showLive: 
                 </Avatar>
                 <p className="text-xs font-semibold mt-1 max-w-20 truncate text-center">{entry.name}</p>
                 <p className="text-sm font-black text-primary">
-                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints + (showLive ? entry.livePoints : 0)} pts
-                  {showLive && entry.livePoints > 0 && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints}</span>}
+                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints + (showLive ? entry.livePoints + entry.liveGroupPoints : 0)} pts
+                  {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints + entry.liveGroupPoints}</span>}
                 </p>
               </div>
               <div
@@ -117,7 +117,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
     return () => clearInterval(interval)
   }, [])
 
-  const hasLiveData = entries.some(e => e.livePoints > 0)
+  const hasLiveData = entries.some(e => e.livePoints > 0 || e.liveGroupPoints > 0)
 
   const displayEntries = useMemo(() => {
     if (showLive || !hasLiveData) return entries
@@ -206,7 +206,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
       <Podium entries={displayEntries} showLive={showLive} />
 
       {/* Live provisional banner */}
-      {showLive && displayEntries.some(e => e.hasLiveMatches) && (
+      {showLive && displayEntries.some(e => e.hasLiveMatches || e.hasLiveGroups) && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow-900/40 bg-yellow-950/20">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-live-pulse shrink-0" />
           <p className="text-xs text-yellow-300/80 font-medium">
@@ -220,7 +220,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
           const isMe = entry.userId === currentUserId
           const fifaColor = FIFA_COLORS[entry.rank as keyof typeof FIFA_COLORS]
           const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-          const displayPts = showLive ? confirmedPts + entry.livePoints : confirmedPts
+          const displayPts = showLive ? confirmedPts + entry.livePoints + entry.liveGroupPoints : confirmedPts
 
           return (
             <Card
@@ -265,10 +265,10 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
                 <div className="text-right shrink-0">
                   <p className="font-black text-lg text-primary font-mono leading-none">{displayPts}</p>
-                  {showLive && entry.livePoints > 0 ? (
+                  {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) ? (
                     <div className="flex items-center justify-end gap-1 mt-0.5">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-                      <span className="text-xs font-bold text-yellow-400">+{entry.livePoints}</span>
+                      <span className="text-xs font-bold text-yellow-400">+{entry.livePoints + entry.liveGroupPoints}</span>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">pts</p>
