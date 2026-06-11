@@ -109,7 +109,18 @@ export async function recalcGroupPredictions(groupName: string) {
       .where(eq(groupStandings.id, sorted[i].id))
   }
 
-  // Use locked values if present, otherwise computed standings
+  const hasLock = lock.length > 0
+
+  // Count finished matches in the group to determine if it's complete (6 matches per group)
+  const groupMatchCount = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(matches)
+    .where(and(eq(matches.groupName, groupName), eq(matches.status, 'FINISHED')))
+  const finishedCount = Number(groupMatchCount[0]?.count ?? 0)
+  const groupComplete = finishedCount >= 6
+
+  // Only score group predictions when group is fully played or admin has locked it
+  if (!hasLock && !groupComplete) return
+
   const actualFirst = lock[0]?.firstPlace ?? sorted[0]?.teamName ?? ''
   const actualSecond = lock[0]?.secondPlace ?? sorted[1]?.teamName ?? ''
 
