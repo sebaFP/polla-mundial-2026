@@ -85,60 +85,62 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
 }
 
 function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string }) {
-  const [showLive, setShowLive] = useState(true)
+  const [showLive, setShowLive] = useState(false)
+  const [showLiveGroups, setShowLiveGroups] = useState(false)
 
-  const hasLiveData = entries.some(e => e.livePoints > 0 || e.liveGroupPoints > 0)
+  const hasLiveMatches = entries.some(e => e.livePoints > 0)
+  const hasLiveGroups = entries.some(e => e.liveGroupPoints > 0)
 
   const displayEntries = useMemo(() => {
-    if (showLive || !hasLiveData) return entries
+    const livePts = (e: LeaderboardEntry) =>
+      (showLive ? e.livePoints : 0) + (showLiveGroups ? e.liveGroupPoints : 0)
     const sorted = entries.map(e => ({ ...e })).sort(
       (a, b) =>
-        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints) -
-        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints)
+        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints + livePts(b)) -
+        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints + livePts(a))
     )
     sorted.forEach((e, i) => { e.rank = i + 1 })
     return sorted
-  }, [entries, showLive, hasLiveData])
+  }, [entries, showLive, showLiveGroups])
 
   if (entries.length === 0) return null
 
   return (
     <div className="space-y-1.5">
-      {hasLiveData && (
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-card/50 border border-border/40 w-fit mb-3">
-          <button
-            onClick={() => setShowLive(false)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              !showLive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Confirmados
-          </button>
-          <button
-            onClick={() => setShowLive(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              showLive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-            En vivo
-          </button>
-        </div>
-      )}
-      {showLive && entries.some(e => e.hasLiveMatches || e.hasLiveGroups) && (
-        <div className="flex items-center gap-1.5 px-1 mb-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-          <span className="text-xs text-yellow-300/70">Clasificación provisional · puntos en juego pueden cambiar</span>
+      {(hasLiveMatches || hasLiveGroups) && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {hasLiveMatches && (
+            <button
+              onClick={() => setShowLive(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                showLive
+                  ? 'bg-red-950/40 border-red-700/50 text-red-300'
+                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
+              Partidos en vivo
+            </button>
+          )}
+          {hasLiveGroups && (
+            <button
+              onClick={() => setShowLiveGroups(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                showLiveGroups
+                  ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              🏅 Grupos en curso
+            </button>
+          )}
         </div>
       )}
       {displayEntries.map(entry => {
         const isMe = entry.userId === userId
         const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-        const displayPts = showLive ? confirmedPts + entry.livePoints + entry.liveGroupPoints : confirmedPts
+        const extraPts = (showLive ? entry.livePoints : 0) + (showLiveGroups ? entry.liveGroupPoints : 0)
+        const displayPts = confirmedPts + extraPts
         return (
           <div
             key={entry.userId}
@@ -161,10 +163,10 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
             </span>
             <div className="text-right shrink-0">
               <span className="font-black text-primary font-mono text-sm leading-none">{displayPts}</span>
-              {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) ? (
+              {extraPts > 0 ? (
                 <div className="flex items-center justify-end gap-1 mt-0.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-                  <span className="text-xs font-bold text-yellow-400">+{entry.livePoints + entry.liveGroupPoints}</span>
+                  <span className="text-xs font-bold text-yellow-400">+{extraPts}</span>
                 </div>
               ) : (
                 <span className="block text-xs text-muted-foreground">pts</span>

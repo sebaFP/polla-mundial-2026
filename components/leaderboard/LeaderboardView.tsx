@@ -21,7 +21,7 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className="text-sm font-bold text-muted-foreground w-8 text-center">{rank}</span>
 }
 
-function Podium({ entries, showLive }: { entries: LeaderboardEntry[]; showLive: boolean }) {
+function Podium({ entries, showLive, showLiveGroups }: { entries: LeaderboardEntry[]; showLive: boolean; showLiveGroups: boolean }) {
   const top3 = entries.slice(0, 3)
   if (top3.length === 0) return null
 
@@ -56,8 +56,11 @@ function Podium({ entries, showLive }: { entries: LeaderboardEntry[]; showLive: 
                 </Avatar>
                 <p className="text-xs font-semibold mt-1 max-w-20 truncate text-center">{entry.name}</p>
                 <p className="text-sm font-black text-primary">
-                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints + (showLive ? entry.livePoints + entry.liveGroupPoints : 0)} pts
-                  {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints + entry.liveGroupPoints}</span>}
+                  {(() => {
+                    const confirmed = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
+                    const extra = (showLive ? entry.livePoints : 0) + (showLiveGroups ? entry.liveGroupPoints : 0)
+                    return <>{confirmed + extra} pts{extra > 0 && <span className="text-yellow-400/90 text-xs ml-1">+{extra}</span>}</>
+                  })()}
                 </p>
               </div>
               <div
@@ -97,7 +100,8 @@ function formatAmount(n: number, currency: string) {
 export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [showLive, setShowLive] = useState(true)
+  const [showLive, setShowLive] = useState(false)
+  const [showLiveGroups, setShowLiveGroups] = useState(false)
 
   async function fetchLeaderboard() {
     try {
@@ -117,18 +121,20 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
     return () => clearInterval(interval)
   }, [])
 
-  const hasLiveData = entries.some(e => e.livePoints > 0 || e.liveGroupPoints > 0)
+  const hasLiveMatches = entries.some(e => e.livePoints > 0)
+  const hasLiveGroups = entries.some(e => e.liveGroupPoints > 0)
 
   const displayEntries = useMemo(() => {
-    if (showLive || !hasLiveData) return entries
+    const livePts = (e: LeaderboardEntry) =>
+      (showLive ? e.livePoints : 0) + (showLiveGroups ? e.liveGroupPoints : 0)
     const sorted = entries.map(e => ({ ...e })).sort(
       (a, b) =>
-        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints) -
-        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints)
+        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints + livePts(b)) -
+        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints + livePts(a))
     )
     sorted.forEach((e, i) => { e.rank = i + 1 })
     return sorted
-  }, [entries, showLive, hasLiveData])
+  }, [entries, showLive, showLiveGroups])
 
   if (loading) {
     return (
@@ -151,29 +157,33 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
   return (
     <div className="space-y-4">
-      {hasLiveData && (
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-card/50 border border-border/40 w-fit">
-          <button
-            onClick={() => setShowLive(false)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              !showLive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Confirmados
-          </button>
-          <button
-            onClick={() => setShowLive(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              showLive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-            En vivo
-          </button>
+      {(hasLiveMatches || hasLiveGroups) && (
+        <div className="flex flex-wrap gap-2">
+          {hasLiveMatches && (
+            <button
+              onClick={() => setShowLive(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                showLive
+                  ? 'bg-red-950/40 border-red-700/50 text-red-300'
+                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
+              Partidos en vivo
+            </button>
+          )}
+          {hasLiveGroups && (
+            <button
+              onClick={() => setShowLiveGroups(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                showLiveGroups
+                  ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              🏅 Grupos en curso
+            </button>
+          )}
         </div>
       )}
 
@@ -203,14 +213,22 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
         </div>
       )}
 
-      <Podium entries={displayEntries} showLive={showLive} />
+      <Podium entries={displayEntries} showLive={showLive} showLiveGroups={showLiveGroups} />
 
-      {/* Live provisional banner */}
-      {showLive && displayEntries.some(e => e.hasLiveMatches || e.hasLiveGroups) && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow-900/40 bg-yellow-950/20">
+      {/* Provisional banners */}
+      {showLive && displayEntries.some(e => e.hasLiveMatches) && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-900/40 bg-red-950/20">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-live-pulse shrink-0" />
+          <p className="text-xs text-red-300/80 font-medium">
+            Incluye puntos de partidos en juego — clasificación provisional.
+          </p>
+        </div>
+      )}
+      {showLiveGroups && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow-900/40 bg-yellow-950/20">
+          <span className="text-sm shrink-0">🏅</span>
           <p className="text-xs text-yellow-300/80 font-medium">
-            Clasificación provisional — hay partidos en juego. Los puntos <span className="text-yellow-300">en juego</span> pueden cambiar.
+            Incluye puntos tentativos de grupos no finalizados — se confirman al cerrar cada grupo.
           </p>
         </div>
       )}
@@ -220,7 +238,8 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
           const isMe = entry.userId === currentUserId
           const fifaColor = FIFA_COLORS[entry.rank as keyof typeof FIFA_COLORS]
           const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-          const displayPts = showLive ? confirmedPts + entry.livePoints + entry.liveGroupPoints : confirmedPts
+          const extraPts = (showLive ? entry.livePoints : 0) + (showLiveGroups ? entry.liveGroupPoints : 0)
+          const displayPts = confirmedPts + extraPts
 
           return (
             <Card
@@ -265,10 +284,10 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
                 <div className="text-right shrink-0">
                   <p className="font-black text-lg text-primary font-mono leading-none">{displayPts}</p>
-                  {showLive && (entry.livePoints > 0 || entry.liveGroupPoints > 0) ? (
+                  {extraPts > 0 ? (
                     <div className="flex items-center justify-end gap-1 mt-0.5">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-                      <span className="text-xs font-bold text-yellow-400">+{entry.livePoints + entry.liveGroupPoints}</span>
+                      <span className="text-xs font-bold text-yellow-400">+{extraPts}</span>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">pts</p>
