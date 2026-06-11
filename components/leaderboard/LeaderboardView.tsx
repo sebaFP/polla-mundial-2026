@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { LeaderboardEntry } from '@/app/api/pollas/[pollaId]/leaderboard/route'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -21,7 +21,7 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className="text-sm font-bold text-muted-foreground w-8 text-center">{rank}</span>
 }
 
-function Podium({ entries }: { entries: LeaderboardEntry[] }) {
+function Podium({ entries, showLive }: { entries: LeaderboardEntry[]; showLive: boolean }) {
   const top3 = entries.slice(0, 3)
   if (top3.length === 0) return null
 
@@ -56,8 +56,8 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
                 </Avatar>
                 <p className="text-xs font-semibold mt-1 max-w-20 truncate text-center">{entry.name}</p>
                 <p className="text-sm font-black text-primary">
-                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints} pts
-                  {entry.livePoints > 0 && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints}</span>}
+                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints + (showLive ? entry.livePoints : 0)} pts
+                  {showLive && entry.livePoints > 0 && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints}</span>}
                 </p>
               </div>
               <div
@@ -97,6 +97,7 @@ function formatAmount(n: number, currency: string) {
 export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [showLive, setShowLive] = useState(true)
 
   async function fetchLeaderboard() {
     try {
@@ -115,6 +116,19 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
     const interval = setInterval(fetchLeaderboard, POLL_INTERVAL)
     return () => clearInterval(interval)
   }, [])
+
+  const hasLiveData = entries.some(e => e.livePoints > 0)
+
+  const displayEntries = useMemo(() => {
+    if (showLive || !hasLiveData) return entries
+    const sorted = entries.map(e => ({ ...e })).sort(
+      (a, b) =>
+        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints) -
+        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints)
+    )
+    sorted.forEach((e, i) => { e.rank = i + 1 })
+    return sorted
+  }, [entries, showLive, hasLiveData])
 
   if (loading) {
     return (
@@ -137,6 +151,32 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
   return (
     <div className="space-y-4">
+      {hasLiveData && (
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-card/50 border border-border/40 w-fit">
+          <button
+            onClick={() => setShowLive(false)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              !showLive
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Confirmados
+          </button>
+          <button
+            onClick={() => setShowLive(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              showLive
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+            En vivo
+          </button>
+        </div>
+      )}
+
       {prizePoolEnabled && totalPool > 0 && (
         <div className="rounded-2xl overflow-hidden">
           <div className="fifa-stripe w-full" style={{ height: '3px', borderRadius: 0 }} />
@@ -163,10 +203,10 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
         </div>
       )}
 
-      <Podium entries={entries} />
+      <Podium entries={displayEntries} showLive={showLive} />
 
       {/* Live provisional banner */}
-      {entries.some(e => e.hasLiveMatches) && (
+      {showLive && displayEntries.some(e => e.hasLiveMatches) && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow-900/40 bg-yellow-950/20">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-live-pulse shrink-0" />
           <p className="text-xs text-yellow-300/80 font-medium">
@@ -176,10 +216,11 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
       )}
 
       <div className="space-y-2">
-        {entries.map(entry => {
+        {displayEntries.map(entry => {
           const isMe = entry.userId === currentUserId
           const fifaColor = FIFA_COLORS[entry.rank as keyof typeof FIFA_COLORS]
           const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
+          const displayPts = showLive ? confirmedPts + entry.livePoints : confirmedPts
 
           return (
             <Card
@@ -223,8 +264,8 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                 </div>
 
                 <div className="text-right shrink-0">
-                  <p className="font-black text-lg text-primary font-mono leading-none">{confirmedPts}</p>
-                  {entry.livePoints > 0 ? (
+                  <p className="font-black text-lg text-primary font-mono leading-none">{displayPts}</p>
+                  {showLive && entry.livePoints > 0 ? (
                     <div className="flex items-center justify-end gap-1 mt-0.5">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
                       <span className="text-xs font-bold text-yellow-400">+{entry.livePoints}</span>
