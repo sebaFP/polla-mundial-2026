@@ -165,10 +165,21 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
       <Podium entries={entries} />
 
+      {/* Live provisional banner */}
+      {entries.some(e => e.hasLiveMatches) && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow-900/40 bg-yellow-950/20">
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-live-pulse shrink-0" />
+          <p className="text-xs text-yellow-300/80 font-medium">
+            Clasificación provisional — hay partidos en juego. Los puntos <span className="text-yellow-300">en juego</span> pueden cambiar.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         {entries.map(entry => {
           const isMe = entry.userId === currentUserId
           const fifaColor = FIFA_COLORS[entry.rank as keyof typeof FIFA_COLORS]
+          const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
 
           return (
             <Card
@@ -212,11 +223,12 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                 </div>
 
                 <div className="text-right shrink-0">
-                  <p className="font-black text-lg text-primary font-mono">
-                    {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints}
-                  </p>
+                  <p className="font-black text-lg text-primary font-mono leading-none">{confirmedPts}</p>
                   {entry.livePoints > 0 ? (
-                    <p className="text-xs font-semibold text-yellow-400/90">+{entry.livePoints} en juego</p>
+                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+                      <span className="text-xs font-bold text-yellow-400">+{entry.livePoints}</span>
+                    </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">pts</p>
                   )}
@@ -227,15 +239,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
         })}
       </div>
 
-      <div className="text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-        {entries.some(e => e.hasLiveMatches) && (
-          <span className="flex items-center gap-1 text-yellow-400/80 font-medium">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
-            Puntos en juego
-          </span>
-        )}
-        <span>· Actualización automática cada 30s</span>
-      </div>
+      <p className="text-center text-xs text-muted-foreground">Actualización automática cada 30s</p>
     </div>
   )
 }

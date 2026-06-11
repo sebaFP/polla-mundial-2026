@@ -86,10 +86,18 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
 
 function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string }) {
   if (entries.length === 0) return null
+  const hasLive = entries.some(e => e.hasLiveMatches)
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
+      {hasLive && (
+        <div className="flex items-center gap-1.5 px-1 mb-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+          <span className="text-xs text-yellow-300/70">Clasificación provisional · puntos en juego pueden cambiar</span>
+        </div>
+      )}
       {entries.map(entry => {
         const isMe = entry.userId === userId
+        const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
         return (
           <div
             key={entry.userId}
@@ -111,11 +119,14 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
               {isMe && <span className="ml-1.5 text-xs text-primary font-normal">(tú)</span>}
             </span>
             <div className="text-right shrink-0">
-              <span className="font-black text-primary font-mono text-sm">
-                {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints}
-              </span>
-              {entry.livePoints > 0 && (
-                <span className="block text-xs text-yellow-400/90 font-semibold">+{entry.livePoints}</span>
+              <span className="font-black text-primary font-mono text-sm leading-none">{confirmedPts}</span>
+              {entry.livePoints > 0 ? (
+                <div className="flex items-center justify-end gap-1 mt-0.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+                  <span className="text-xs font-bold text-yellow-400">+{entry.livePoints}</span>
+                </div>
+              ) : (
+                <span className="block text-xs text-muted-foreground">pts</span>
               )}
             </div>
           </div>
