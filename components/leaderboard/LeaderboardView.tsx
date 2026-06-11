@@ -273,9 +273,10 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                     {isMe && <Badge className="text-xs bg-primary/20 text-primary border-primary/30 shrink-0">Tú</Badge>}
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                    <span title="Partidos">⚽ {entry.matchPoints + entry.pendingPoints}</span>
-                    <span title="Grupos">🏅 {entry.groupPoints}</span>
+                    <span title="Partidos">⚽ {entry.matchPoints + entry.pendingPoints + (showLive ? entry.livePoints : 0)}</span>
+                    <span title="Grupos">🏅 {entry.groupPoints + (showLiveGroups ? entry.liveGroupPoints : 0)}</span>
                     <span title="Especiales">⭐ {entry.specialPoints}</span>
+                    {entry.questionPoints > 0 && <span title="Preguntas">❓ {entry.questionPoints}</span>}
                     <span className="text-muted-foreground/60 hidden sm:inline">
                       {entry.scoredMatches}/{entry.predictedMatches} partidos
                     </span>
