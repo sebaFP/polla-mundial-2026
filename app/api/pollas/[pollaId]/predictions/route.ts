@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { predictions, matches } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getMemberRole, isPollaOpen, getPollaById, getPollaConfig } from '@/lib/polla'
+import { getMemberRole, isPollaOpen, getPollaById, getPollaConfig, isMemberPredictionUnlocked } from '@/lib/polla'
 import { autoFillGroupPrediction } from '@/lib/group-auto-fill'
 
 type RouteContext = { params: Promise<{ pollaId: string }> }
@@ -52,13 +52,31 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Marcador inválido' }, { status: 400 })
   }
 
-  const match = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1)
+  const [match, pollaConfig, unlocked] = await Promise.all([
+    db.select().from(matches).where(eq(matches.id, matchId)).limit(1),
+    getPollaConfig(pollaId),
+    isMemberPredictionUnlocked(pollaId, session.userId),
+  ])
   if (match.length === 0) return NextResponse.json({ error: 'Partido no encontrado' }, { status: 404 })
 
-  if (match[0].lockTime && new Date() >= match[0].lockTime) {
-    return NextResponse.json({ error: 'Pronóstico cerrado para este partido' }, { status: 403 })
+  if (!unlocked) {
+    const lockMode = pollaConfig['prediction_lock_mode'] ?? 'match'
+    let effectiveLockTime = match[0].lockTime
+    if (lockMode === 'phase') {
+      const phaseMatches = await db.select({ lockTime: matches.lockTime })
+        .from(matches).where(eq(matches.stage, match[0].stage))
+      effectiveLockTime = phaseMatches.reduce((min, m) =>
+        m.lockTime && (!min || m.lockTime < min) ? m.lockTime : min, null as Date | null)
+    } else if (lockMode === 'total') {
+      const allM = await db.select({ lockTime: matches.lockTime }).from(matches)
+      effectiveLockTime = allM.reduce((min, m) =>
+        m.lockTime && (!min || m.lockTime < min) ? m.lockTime : min, null as Date | null)
+    }
+    if (effectiveLockTime && new Date() >= effectiveLockTime) {
+      return NextResponse.json({ error: 'Pronóstico cerrado para este partido' }, { status: 403 })
+    }
   }
-  if (match[0].status !== 'SCHEDULED' && match[0].status !== 'TIMED') {
+  if (!unlocked && match[0].status !== 'SCHEDULED' && match[0].status !== 'TIMED') {
     return NextResponse.json({ error: 'Partido ya iniciado' }, { status: 403 })
   }
   if (!match[0].team1Resolved || !match[0].team2Resolved) {
@@ -68,7 +86,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }
 
   if (match[0].stage !== 'GROUP_STAGE') {
-    const pollaConfig = await getPollaConfig(pollaId)
     if (pollaConfig['knockout_prediction_mode'] === 'sequential') {
       const stageOrder = ['GROUP_STAGE', 'LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
       const idx = stageOrder.indexOf(match[0].stage)

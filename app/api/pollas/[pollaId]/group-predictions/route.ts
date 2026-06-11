@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { groupPredictions, matches } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getMemberRole, isPollaOpen, getPollaById } from '@/lib/polla'
+import { getMemberRole, isPollaOpen, getPollaById, isMemberPredictionUnlocked } from '@/lib/polla'
 
 type RouteContext = { params: Promise<{ pollaId: string }> }
 
@@ -52,10 +52,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'El tercer lugar debe ser diferente al 1° y 2°' }, { status: 400 })
   }
 
-  const firstGroupMatch = await db.select().from(matches)
-    .where(and(eq(matches.groupName, groupName), eq(matches.stage, 'GROUP_STAGE')))
+  const [firstGroupMatch, unlocked] = await Promise.all([
+    db.select().from(matches).where(and(eq(matches.groupName, groupName), eq(matches.stage, 'GROUP_STAGE'))),
+    isMemberPredictionUnlocked(pollaId, session.userId),
+  ])
 
-  if (firstGroupMatch.length > 0) {
+  if (!unlocked && firstGroupMatch.length > 0) {
     const firstMatchTime = firstGroupMatch.reduce((earliest, m) =>
       m.matchDatetime < earliest.matchDatetime ? m : earliest
     )

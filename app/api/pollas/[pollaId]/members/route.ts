@@ -117,12 +117,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const adminRole = await getMemberRole(pollaId, session.userId)
   if (adminRole !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { userId, role, inscriptionStatus } = await req.json()
+  const { userId, role, inscriptionStatus, predictionUnlocked } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
 
-  const updates: Partial<{ role: string; inscriptionStatus: string }> = {}
+  const updates: Partial<{ role: string; inscriptionStatus: string; predictionUnlocked: boolean }> = {}
   if (role) updates.role = role
   if (inscriptionStatus) updates.inscriptionStatus = inscriptionStatus
+  if (typeof predictionUnlocked === 'boolean') updates.predictionUnlocked = predictionUnlocked
 
   const [updated] = await db.update(pollaMembers)
     .set(updates)

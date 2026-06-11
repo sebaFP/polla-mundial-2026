@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
-import { Link2 } from 'lucide-react'
+import { Link2, LockOpen, Lock } from 'lucide-react'
 
 type Member = {
   userId: string
@@ -26,6 +26,7 @@ type Member = {
   groupPredCount: number
   specialPredCount: number
   questionsAnswered: number
+  predictionUnlocked: boolean
 }
 
 type InscriptionStatus = 'pending' | 'confirmed' | 'approved' | 'rejected'
@@ -135,6 +136,23 @@ export default function PollaParticipantsManager({
       if (!res.ok) { toast.error(data.error); return }
       setParticipants(prev => prev.map(p => p.userId === userId ? { ...p, inscriptionStatus: status } : p))
       toast.success(`Estado: ${STATUS_LABELS[status]}`)
+    } catch {
+      toast.error('Error')
+    }
+  }
+
+  async function togglePredictionUnlock(userId: string, currentUnlocked: boolean) {
+    const next = !currentUnlocked
+    try {
+      const res = await fetch(apiBase, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, predictionUnlocked: next }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      setParticipants(prev => prev.map(p => p.userId === userId ? { ...p, predictionUnlocked: next } : p))
+      toast.success(next ? 'Pronósticos desbloqueados' : 'Pronósticos bloqueados')
     } catch {
       toast.error('Error')
     }
@@ -262,6 +280,15 @@ export default function PollaParticipantsManager({
                     QR
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`text-xs ${p.predictionUnlocked ? 'border-amber-500/50 text-amber-400 hover:bg-amber-500/10' : 'text-muted-foreground'}`}
+                  title={p.predictionUnlocked ? 'Bloquear pronósticos' : 'Desbloquear pronósticos'}
+                  onClick={() => togglePredictionUnlock(p.userId, p.predictionUnlocked)}
+                >
+                  {p.predictionUnlocked ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                </Button>
                 {p.role === 'admin' ? (
                   <span className="text-xs text-muted-foreground self-center px-2">
                     Gestionado en Admins

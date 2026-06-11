@@ -336,6 +336,41 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
               {LOCK_ITEMS.map(item => (
                 <PointsSlider key={item.key} item={item} value={parseInt(config[item.key] ?? '15')} onChange={v => update(item.key, v)} />
               ))}
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm font-medium">Modo de bloqueo</p>
+                  <p className="text-xs text-muted-foreground">Cuándo se cierran los pronósticos de partido</p>
+                </div>
+                <div className="space-y-2 pt-1">
+                  {[
+                    { value: 'match', label: 'Partido a partido', desc: 'Cada partido se cierra individualmente según su hora de inicio' },
+                    { value: 'phase', label: 'Por fase', desc: 'Todos los partidos de una fase se cierran cuando inicia el primero (ej. toda la fase de grupos, toda la R32, etc.)' },
+                    { value: 'total', label: 'Total', desc: 'Todos los pronósticos se cierran cuando inicia el primer partido del torneo' },
+                  ].map(opt => (
+                    <label
+                      key={opt.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        (config.prediction_lock_mode ?? 'match') === opt.value
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="prediction_lock_mode"
+                        value={opt.value}
+                        checked={(config.prediction_lock_mode ?? 'match') === opt.value}
+                        onChange={() => update('prediction_lock_mode', opt.value)}
+                        className="mt-0.5 accent-primary shrink-0"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 

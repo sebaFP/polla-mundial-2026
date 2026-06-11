@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { specialPredictions, matches } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getMemberRole, isPollaOpen, getPollaById } from '@/lib/polla'
+import { getMemberRole, isPollaOpen, getPollaById, isMemberPredictionUnlocked } from '@/lib/polla'
 
 const VALID_TYPES = [
   'champion', 'finalist', 'third', 'top_scorer', 'best_goalkeeper', 'best_player',
@@ -52,8 +52,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
   }
 
-  const firstMatch = await db.select().from(matches).where(eq(matches.stage, 'GROUP_STAGE'))
-  if (firstMatch.length > 0) {
+  const [firstMatch, unlocked] = await Promise.all([
+    db.select().from(matches).where(eq(matches.stage, 'GROUP_STAGE')),
+    isMemberPredictionUnlocked(pollaId, session.userId),
+  ])
+  if (!unlocked && firstMatch.length > 0) {
     const earliest = firstMatch.reduce((e, m) => m.matchDatetime < e.matchDatetime ? m : e)
     if (earliest.lockTime && new Date() >= earliest.lockTime) {
       return NextResponse.json({ error: 'Predicciones especiales cerradas' }, { status: 403 })

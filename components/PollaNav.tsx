@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   Menu, Link2, LayoutDashboard, Users, ClipboardList,
-  Settings, ShieldCheck, Eye, Target, LayoutGrid, Star, Trophy,
+  Settings, ShieldCheck, Eye, Target, LayoutGrid, Star, Trophy, Radio,
 } from 'lucide-react'
 
 function Wordmark({ onClick }: { onClick?: () => void }) {
@@ -48,6 +48,7 @@ export default function PollaNav({
   const isOnAdmin = pathname.startsWith(adminBase)
 
   const mainLinks = [
+    { href: `${base}/live`, label: 'En Vivo', icon: Radio },
     { href: `${base}/predictions`, label: 'Pronósticos', icon: Target },
     { href: `${base}/groups`, label: 'Grupos', icon: LayoutGrid },
     { href: `${base}/specials`, label: 'Especiales', icon: Star },

@@ -21,6 +21,14 @@ export async function getMemberRole(pollaId: string, userId: string): Promise<'a
   return (member?.role as 'admin' | 'participant') ?? null
 }
 
+export async function isMemberPredictionUnlocked(pollaId: string, userId: string): Promise<boolean> {
+  const [member] = await db.select({ predictionUnlocked: pollaMembers.predictionUnlocked })
+    .from(pollaMembers)
+    .where(and(eq(pollaMembers.pollaId, pollaId), eq(pollaMembers.userId, userId)))
+    .limit(1)
+  return member?.predictionUnlocked ?? false
+}
+
 export async function isPollaOpen(pollaId: string): Promise<boolean> {
   const [row] = await db.select({ value: tournamentConfig.value })
     .from(tournamentConfig)

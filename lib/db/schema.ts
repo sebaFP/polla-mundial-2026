@@ -35,6 +35,7 @@ export const pollaMembers = pgTable('polla_members', {
   inscriptionStatus: text('inscription_status').notNull().default('pending'), // pending|confirmed|approved|rejected
   inscriptionNotes: text('inscription_notes'),
   joinedAt: timestamp('joined_at').defaultNow().notNull(),
+  predictionUnlocked: boolean('prediction_unlocked').default(false).notNull(),
 }, (t) => [unique().on(t.pollaId, t.userId)])
 
 // QR invitation tokens — scoped per polla

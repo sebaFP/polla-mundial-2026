@@ -31,6 +31,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       inscriptionStatus: pollaMembers.inscriptionStatus,
       inscriptionNotes: pollaMembers.inscriptionNotes,
       joinedAt: pollaMembers.joinedAt,
+      predictionUnlocked: pollaMembers.predictionUnlocked,
       name: users.name,
       email: users.email,
       avatarColor: users.avatarColor,
@@ -97,6 +98,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       groupPredCount: grpMap[m.userId] ?? 0,
       specialPredCount: spcMap[m.userId] ?? 0,
       questionsAnswered: ansMap[m.userId] ?? 0,
+      predictionUnlocked: m.predictionUnlocked ?? false,
     }))
 
   const participantOptions = participants.map(m => ({ userId: m.userId, name: m.name }))

@@ -59,6 +59,7 @@ export default async function PollaPredictionsPage({ params }: { params: Promise
         userId={session.userId}
         pollaId={polla.id}
         knockoutMode={config['knockout_prediction_mode'] ?? 'api'}
+        lockMode={config['prediction_lock_mode'] ?? 'match'}
       />
     </div>
   )

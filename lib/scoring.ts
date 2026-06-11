@@ -129,6 +129,7 @@ export const DEFAULT_CONFIG: Config = {
   points_bonus_penalties_range: '3',
   points_bonus_group_top_scorer: '5',
   prediction_lock_minutes: '15',
+  prediction_lock_mode: 'match',
   knockout_prediction_mode: 'api',
   polla_open: 'true',
   rules_text: '',

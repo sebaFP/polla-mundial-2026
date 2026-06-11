@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Match, Prediction } from '@/lib/db/schema'
 import { STAGES, STAGE_ORDER, getFlag } from '@/lib/teams'
 import { Badge } from '@/components/ui/badge'
@@ -10,22 +10,20 @@ import { toast } from 'sonner'
 import { format, isPast, differenceInMinutes } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+const MATCH_POLL_INTERVAL = 30_000
+
 type Props = {
   matches: Match[]
   initialPredictions: Prediction[]
   userId: string
   pollaId: string
   knockoutMode?: string
+  lockMode?: string
 }
 
 type PredictionMap = Record<number, { s1: number | string; s2: number | string; saved: boolean; points?: number | null }>
 
 const GROUP_STAGE_MATCHDAYS = ['Jornada 1', 'Jornada 2', 'Jornada 3']
-
-function isLocked(match: Match): boolean {
-  if (!match.lockTime) return false
-  return new Date() >= new Date(match.lockTime)
-}
 
 function getStatusBadge(match: Match, locked: boolean) {
   if (match.status === 'FINISHED') return <Badge className="bg-green-900/60 text-green-300 border-green-700 text-xs">FIN</Badge>
@@ -36,7 +34,8 @@ function getStatusBadge(match: Match, locked: boolean) {
   return null
 }
 
-export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api' }: Props) {
+export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api', lockMode = 'match' }: Props) {
+  const [liveMatches, setLiveMatches] = useState<Match[]>(matches)
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [selectedGroup, setSelectedGroup] = useState<string>('')
   const [preds, setPreds] = useState<PredictionMap>(() => {
@@ -48,15 +47,26 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
   })
   const [saving, setSaving] = useState<number | null>(null)
 
+  useEffect(() => {
+    async function fetchMatches() {
+      try {
+        const res = await fetch(`/api/pollas/${pollaId}/matches`, { cache: 'no-store' })
+        if (res.ok) setLiveMatches(await res.json())
+      } catch { /* ignore */ }
+    }
+    const interval = setInterval(fetchMatches, MATCH_POLL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [pollaId])
+
   const stages = useMemo(() => {
-    const available = new Set(matches.map(m => m.stage))
+    const available = new Set(liveMatches.map(m => m.stage))
     return STAGE_ORDER.filter(s => available.has(s))
-  }, [matches])
+  }, [liveMatches])
 
   const groups = useMemo(() => {
-    const gs = new Set(matches.filter(m => m.stage === 'GROUP_STAGE').map(m => m.groupName).filter(Boolean))
+    const gs = new Set(liveMatches.filter(m => m.stage === 'GROUP_STAGE').map(m => m.groupName).filter(Boolean))
     return Array.from(gs).sort() as string[]
-  }, [matches])
+  }, [liveMatches])
 
   const activeGroup = selectedGroup && groups.includes(selectedGroup) ? selectedGroup : groups[0] ?? ''
 
@@ -65,13 +75,13 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
     const knockoutStages = STAGE_ORDER.filter(s => s !== 'GROUP_STAGE')
     for (const s of knockoutStages) {
       const prevStage = s === 'LAST_32' ? 'GROUP_STAGE' : STAGE_ORDER[STAGE_ORDER.indexOf(s) - 1]
-      const prevMatches = matches.filter(m => m.stage === prevStage)
+      const prevMatches = liveMatches.filter(m => m.stage === prevStage)
       if (prevMatches.length === 0 || !prevMatches.every(m => m.status === 'FINISHED')) return null
-      const thisMatches = matches.filter(m => m.stage === s)
+      const thisMatches = liveMatches.filter(m => m.stage === s)
       if (thisMatches.length === 0 || !thisMatches.every(m => m.status === 'FINISHED')) return s
     }
     return null
-  }, [matches, knockoutMode])
+  }, [liveMatches, knockoutMode])
 
   function isStageAccessible(s: string): boolean {
     if (s === 'GROUP_STAGE') return true
@@ -87,12 +97,46 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
   const visibleMatches = useMemo(() => {
     if (stage === 'GROUP_STAGE') {
       const group = selectedGroup && groups.includes(selectedGroup) ? selectedGroup : groups[0] ?? ''
-      return matches.filter(m => m.stage === 'GROUP_STAGE' && m.groupName === group)
+      return liveMatches.filter(m => m.stage === 'GROUP_STAGE' && m.groupName === group)
         .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())
     }
-    return matches.filter(m => m.stage === stage)
+    return liveMatches.filter(m => m.stage === stage)
       .sort((a, b) => new Date(a.matchDatetime).getTime() - new Date(b.matchDatetime).getTime())
-  }, [matches, stage, selectedGroup, groups])
+  }, [liveMatches, stage, selectedGroup, groups])
+
+  const currentlyLive = useMemo(
+    () => liveMatches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED'),
+    [liveMatches]
+  )
+
+  const lockTimeMap = useMemo<Record<number, Date | null>>(() => {
+    const map: Record<number, Date | null> = {}
+    if (lockMode === 'total') {
+      let globalMin: Date | null = null
+      for (const m of liveMatches) {
+        if (!m.lockTime) continue
+        const t = new Date(m.lockTime)
+        if (!globalMin || t < globalMin) globalMin = t
+      }
+      for (const m of liveMatches) map[m.id] = globalMin
+    } else if (lockMode === 'phase') {
+      const stageMin: Record<string, Date | null> = {}
+      for (const m of liveMatches) {
+        if (!m.lockTime) continue
+        const t = new Date(m.lockTime)
+        if (!stageMin[m.stage] || t < stageMin[m.stage]!) stageMin[m.stage] = t
+      }
+      for (const m of liveMatches) map[m.id] = stageMin[m.stage] ?? null
+    } else {
+      for (const m of liveMatches) map[m.id] = m.lockTime ? new Date(m.lockTime) : null
+    }
+    return map
+  }, [liveMatches, lockMode])
+
+  function isLocked(match: Match): boolean {
+    const t = lockTimeMap[match.id]
+    return t ? new Date() >= t : false
+  }
 
   async function savePrediction(matchId: number) {
     const pred = preds[matchId]
@@ -125,6 +169,46 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
 
   return (
     <div className="space-y-4">
+      {/* Live now banner */}
+      {currentlyLive.length > 0 && (
+        <div className="rounded-2xl overflow-hidden border border-red-900/50" style={{ background: 'rgba(127,0,0,0.12)' }}>
+          <div className="px-4 py-2.5 border-b border-red-900/30 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-live-pulse shrink-0" />
+            <span className="text-xs font-bold text-red-400 uppercase tracking-widest">En Vivo Ahora</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {currentlyLive.map(match => {
+              const pred = preds[match.id]
+              return (
+                <div key={match.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card/50">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-base leading-none">{getFlag(match.team1)}</span>
+                    <span className="font-semibold text-sm truncate">{match.team1}</span>
+                  </div>
+                  <div className="text-center shrink-0">
+                    <div className="text-2xl font-black font-mono text-primary leading-none">
+                      {match.score1 ?? '?'} – {match.score2 ?? '?'}
+                    </div>
+                    {pred && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Tu pronóstico: {pred.s1}–{pred.s2}
+                      </div>
+                    )}
+                    {match.status === 'PAUSED' && (
+                      <div className="text-xs text-yellow-400/80 mt-0.5">Entretiempo</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+                    <span className="font-semibold text-sm truncate text-right">{match.team2}</span>
+                    <span className="text-base leading-none">{getFlag(match.team2)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stage selector */}
       <div className="flex flex-wrap gap-2">
         {stages.map(s => {
