@@ -223,3 +223,15 @@ export type PollaQuestion = typeof pollaQuestions.$inferSelect
 export type PollaQuestionOption = typeof pollaQuestionOptions.$inferSelect
 export type PollaAnswer = typeof pollaAnswers.$inferSelect
 export type GroupStandingLock = typeof groupStandingLocks.$inferSelect
+
+// Open self-registration links — no user pre-assigned; anyone with the link can register
+export const pollaInviteLinks = pgTable('polla_invite_links', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pollaId: uuid('polla_id').notNull().references(() => pollas.id, { onDelete: 'cascade' }),
+  token: uuid('token').notNull().unique().defaultRandom(),
+  label: text('label'),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  expiresAt: timestamp('expires_at'),
+})
+export type PollaInviteLink = typeof pollaInviteLinks.$inferSelect

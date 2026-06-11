@@ -10,6 +10,7 @@ type FileEntry = {
   id: string
   file: File
   userId: string
+  newName?: string
   format: 'v2' | 'legacy' | 'invalid'
   predCount: number
   parsedBody: Record<string, unknown> | null
@@ -46,6 +47,7 @@ export default function BulkImportPanel({ pollaId, participants }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [running, setRunning] = useState(false)
+  const [extraParticipants, setExtraParticipants] = useState<Participant[]>([])
 
   const done = entries.filter(e => e.status === 'done').length
   const total = entries.length
@@ -102,13 +104,33 @@ export default function BulkImportPanel({ pollaId, participants }: Props) {
   }
 
   async function handleRun() {
-    const toRun = entries.filter(e => e.status === 'pending' && e.format !== 'invalid' && e.userId)
+    const toRun = entries.filter(e =>
+      e.status === 'pending' && e.format !== 'invalid' &&
+      (e.userId && e.userId !== '__new__' || (e.userId === '__new__' && e.newName?.trim()))
+    )
     if (toRun.length === 0) return
     setRunning(true)
     for (const entry of toRun) {
       updateEntry(entry.id, { status: 'running' })
       try {
-        const body = { ...entry.parsedBody, targetUserId: entry.userId }
+        let targetUserId = entry.userId
+
+        if (entry.userId === '__new__') {
+          const createRes = await fetch(`/api/pollas/${pollaId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: entry.newName!.trim() }),
+          })
+          const createData = await createRes.json()
+          if (!createRes.ok) {
+            updateEntry(entry.id, { status: 'error', errorMsg: createData.error ?? 'Error creando participante' })
+            continue
+          }
+          targetUserId = createData.id
+          setExtraParticipants(prev => [...prev, { userId: createData.id, name: createData.name }])
+        }
+
+        const body = { ...entry.parsedBody, targetUserId }
         const res = await fetch(`/api/pollas/${pollaId}/import-predictions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -118,7 +140,7 @@ export default function BulkImportPanel({ pollaId, participants }: Props) {
         if (!res.ok) {
           updateEntry(entry.id, { status: 'error', errorMsg: data.error ?? 'Error' })
         } else {
-          updateEntry(entry.id, { status: 'done', result: data })
+          updateEntry(entry.id, { status: 'done', result: data, userId: targetUserId })
         }
       } catch (err) {
         updateEntry(entry.id, { status: 'error', errorMsg: String(err) })
@@ -127,8 +149,14 @@ export default function BulkImportPanel({ pollaId, participants }: Props) {
     setRunning(false)
   }
 
-  const pendingValid = entries.filter(e => e.status === 'pending' && e.format !== 'invalid' && e.userId).length
-  const unassigned = entries.filter(e => e.status === 'pending' && e.format !== 'invalid' && !e.userId).length
+  const pendingValid = entries.filter(e =>
+    e.status === 'pending' && e.format !== 'invalid' &&
+    (e.userId && e.userId !== '__new__' || (e.userId === '__new__' && e.newName?.trim()))
+  ).length
+  const unassigned = entries.filter(e =>
+    e.status === 'pending' && e.format !== 'invalid' &&
+    (!e.userId || (e.userId === '__new__' && !e.newName?.trim()))
+  ).length
 
   return (
     <div className="glass-card rounded-xl p-5 space-y-4">
@@ -188,20 +216,38 @@ export default function BulkImportPanel({ pollaId, participants }: Props) {
                     </td>
                     <td className="py-2 pr-3">
                       {entry.status === 'pending' ? (
-                        <select
-                          value={entry.userId}
-                          onChange={e => updateEntry(entry.id, { userId: e.target.value })}
-                          className="rounded border border-border bg-background px-2 py-1 text-xs w-full max-w-[180px]"
-                          disabled={entry.format === 'invalid'}
-                        >
-                          <option value="">— Seleccionar —</option>
-                          {participants.map(p => (
-                            <option key={p.userId} value={p.userId}>{p.name}</option>
-                          ))}
-                        </select>
+                        <div className="space-y-1">
+                          <select
+                            value={entry.userId}
+                            onChange={e => {
+                              const val = e.target.value
+                              const autoName = val === '__new__'
+                                ? entry.file.name.replace(/\.xlsx$/i, '')
+                                : undefined
+                              updateEntry(entry.id, { userId: val, newName: autoName })
+                            }}
+                            className="rounded border border-border bg-background px-2 py-1 text-xs w-full max-w-[180px]"
+                            disabled={entry.format === 'invalid'}
+                          >
+                            <option value="">— Seleccionar —</option>
+                            {[...participants, ...extraParticipants].map(p => (
+                              <option key={p.userId} value={p.userId}>{p.name}</option>
+                            ))}
+                            <option value="__new__">+ Crear nuevo…</option>
+                          </select>
+                          {entry.userId === '__new__' && (
+                            <input
+                              type="text"
+                              value={entry.newName ?? ''}
+                              onChange={e => updateEntry(entry.id, { newName: e.target.value })}
+                              placeholder="Nombre del participante"
+                              className="rounded border border-border bg-background px-2 py-1 text-xs w-full max-w-[180px]"
+                            />
+                          )}
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">
-                          {participants.find(p => p.userId === entry.userId)?.name ?? '—'}
+                          {[...participants, ...extraParticipants].find(p => p.userId === entry.userId)?.name ?? '—'}
                         </span>
                       )}
                     </td>

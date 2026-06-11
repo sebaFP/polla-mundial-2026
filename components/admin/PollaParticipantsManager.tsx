@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import QRCodeDisplay from './QRCodeDisplay'
-import { Link2, LockOpen, Lock } from 'lucide-react'
+import { Link2, LockOpen, Lock, ChevronDown, ChevronUp, Copy, Trash2, Plus, Eye } from 'lucide-react'
 
 type Member = {
   userId: string
@@ -83,6 +83,77 @@ export default function PollaParticipantsManager({
   const [email, setEmail] = useState('')
   const [creating, setCreating] = useState(false)
   const [selectedQR, setSelectedQR] = useState<Member | null>(null)
+
+  type InviteLink = { id: string; token: string; label: string | null; createdAt: string | null; url?: string }
+  const [inviteLinks, setInviteLinks] = useState<InviteLink[]>([])
+  const [showInviteSection, setShowInviteSection] = useState(false)
+  const [inviteLinkLabel, setInviteLinkLabel] = useState('')
+  const [creatingLink, setCreatingLink] = useState(false)
+  const [inviteLinksLoaded, setInviteLinksLoaded] = useState(false)
+
+  const inviteBase = `/api/pollas/${pollaId}/invite-links`
+
+  async function loadInviteLinks() {
+    if (inviteLinksLoaded) return
+    try {
+      const res = await fetch(inviteBase)
+      if (res.ok) {
+        const data = await res.json()
+        const appUrl = window.location.origin
+        setInviteLinks(data.map((l: InviteLink) => ({ ...l, url: `${appUrl}/invite/${l.token}` })))
+        setInviteLinksLoaded(true)
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function toggleInviteSection() {
+    const next = !showInviteSection
+    setShowInviteSection(next)
+    if (next) loadInviteLinks()
+  }
+
+  async function createInviteLink() {
+    setCreatingLink(true)
+    try {
+      const res = await fetch(inviteBase, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: inviteLinkLabel.trim() || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error); return }
+      const appUrl = window.location.origin
+      setInviteLinks(prev => [...prev, { ...data, url: `${appUrl}/invite/${data.token}` }])
+      setInviteLinkLabel('')
+      toast.success('Link creado')
+    } catch {
+      toast.error('Error creando link')
+    } finally {
+      setCreatingLink(false)
+    }
+  }
+
+  async function deleteInviteLink(token: string) {
+    if (!confirm('¿Eliminar este link? Los participantes que aún no se registren no podrán usarlo.')) return
+    try {
+      const res = await fetch(inviteBase, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      if (!res.ok) { toast.error('Error eliminando'); return }
+      setInviteLinks(prev => prev.filter(l => l.token !== token))
+      toast.success('Link eliminado')
+    } catch {
+      toast.error('Error')
+    }
+  }
+
+  function copyInviteLink(url: string) {
+    navigator.clipboard.writeText(url)
+      .then(() => toast.success('Link copiado'))
+      .catch(() => toast.error('No se pudo copiar'))
+  }
 
   const apiBase = `/api/pollas/${pollaId}/members`
 
@@ -201,6 +272,61 @@ export default function PollaParticipantsManager({
         </CardContent>
       </Card>
 
+      {/* Self-registration links */}
+      <Card className="glass-card">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-6 py-4 text-left"
+          onClick={toggleInviteSection}
+        >
+          <div>
+            <p className="font-semibold text-sm">Links de registro</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Comparte un link para que los participantes se registren solos</p>
+          </div>
+          {showInviteSection ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+        </button>
+        {showInviteSection && (
+          <CardContent className="pt-0 space-y-4">
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="space-y-1 flex-1 min-w-36">
+                <Label className="text-xs">Etiqueta (opcional)</Label>
+                <Input
+                  value={inviteLinkLabel}
+                  onChange={e => setInviteLinkLabel(e.target.value)}
+                  placeholder="ej: Amigos del trabajo"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <Button size="sm" onClick={createInviteLink} disabled={creatingLink} className="gap-1.5 shrink-0">
+                <Plus className="h-3.5 w-3.5" />
+                {creatingLink ? 'Creando…' : 'Nuevo link'}
+              </Button>
+            </div>
+            {inviteLinks.length > 0 && (
+              <div className="space-y-2">
+                {inviteLinks.map(link => (
+                  <div key={link.token} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/40">
+                    <div className="flex-1 min-w-0">
+                      {link.label && <p className="text-xs font-medium truncate">{link.label}</p>}
+                      <p className="text-xs text-muted-foreground truncate font-mono">{link.url}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={() => copyInviteLink(link.url!)}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0 text-destructive hover:text-destructive" onClick={() => deleteInviteLink(link.token)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {inviteLinksLoaded && inviteLinks.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-2">Sin links creados aún</p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Stats */}
       {inscriptionEnabled && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -275,6 +401,15 @@ export default function PollaParticipantsManager({
                 </div>
               </div>
               <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  title="Ver pronósticos"
+                  onClick={() => window.open(`/polla/${pollaSlug}/admin/view/${p.userId}`, '_blank')}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
                 {p.qrToken && (
                   <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedQR(p)}>
                     QR

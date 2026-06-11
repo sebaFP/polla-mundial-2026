@@ -7,6 +7,8 @@ export async function proxy(req: NextRequest) {
   // Public paths
   if (
     pathname.startsWith('/join/') ||
+    pathname.startsWith('/invite/') ||
+    pathname.startsWith('/api/invite/') ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/reset-password' ||

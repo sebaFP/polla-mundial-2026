@@ -7,7 +7,7 @@ import { getFlag } from '@/lib/teams'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { format, isToday, isYesterday } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const POLL_INTERVAL = 30_000
@@ -174,14 +174,6 @@ export default function LiveView({ initialMatches, initialPredictions, initialLe
     [liveMatches]
   )
 
-  const todayMatches = useMemo(
-    () => liveMatches
-      .filter(m => isToday(new Date(m.matchDatetime)) || isYesterday(new Date(m.matchDatetime)))
-      .filter(m => m.status === 'FINISHED' || m.status === 'IN_PLAY' || m.status === 'PAUSED')
-      .sort((a, b) => new Date(b.matchDatetime).getTime() - new Date(a.matchDatetime).getTime()),
-    [liveMatches]
-  )
-
   const recentFinished = useMemo(
     () => liveMatches
       .filter(m => m.status === 'FINISHED' && (nowTs - new Date(m.matchDatetime).getTime()) < twentyFourHoursMs)
@@ -234,9 +226,17 @@ export default function LiveView({ initialMatches, initialPredictions, initialLe
       {/* Leaderboard */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Clasificación</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Clasificación</h2>
+            {leaderboard.some(e => e.hasLiveMatches) && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-yellow-400/80">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+                en vivo
+              </span>
+            )}
+          </div>
           <span className="text-xs text-muted-foreground/60">
-            Actualizado {format(lastUpdated, 'HH:mm:ss')}
+            {format(lastUpdated, 'HH:mm:ss')}
           </span>
         </div>
         <MiniLeaderboard entries={leaderboard} userId={userId} />
