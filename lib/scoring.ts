@@ -42,11 +42,14 @@ export function calcMatchPoints(
   real1: number, real2: number,
   config: Config
 ): number {
-  if (pred1 === real1 && pred2 === real2)
+  // Coerce to numbers — DB drivers can return strings for integer columns
+  const p1 = Number(pred1), p2 = Number(pred2)
+  const r1 = Number(real1), r2 = Number(real2)
+  if (p1 === r1 && p2 === r2)
     return getConfigValue(config, 'points_exact_score', 5)
-  if ((pred1 - pred2) === (real1 - real2))
+  if ((p1 - p2) === (r1 - r2))
     return getConfigValue(config, 'points_goal_diff', 3)
-  if (Math.sign(pred1 - pred2) === Math.sign(real1 - real2))
+  if (Math.sign(p1 - p2) === Math.sign(r1 - r2))
     return getConfigValue(config, 'points_tendency', 2)
   return 0
 }

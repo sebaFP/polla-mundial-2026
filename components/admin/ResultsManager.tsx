@@ -52,10 +52,14 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(`Sync completado: ${data.updated} partidos actualizados`)
+        if (data.errors?.length > 0) {
+          toast.warning(`Sync con errores: ${data.errors.join(', ')}`)
+        } else {
+          toast.success(`Sync completado: ${data.updated} partidos actualizados`)
+        }
         window.location.reload()
       } else {
-        toast.error('Error en sync')
+        toast.error(`Error en sync: ${data.error ?? 'desconocido'}`)
       }
     } catch {
       toast.error('Error de conexión')
