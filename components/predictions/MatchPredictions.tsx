@@ -26,12 +26,15 @@ type PredictionMap = Record<number, { s1: number | string; s2: number | string; 
 const GROUP_STAGE_MATCHDAYS = ['Jornada 1', 'Jornada 2', 'Jornada 3']
 
 function getStatusBadge(match: Match, locked: boolean) {
-  if (match.status === 'FINISHED') return <Badge className="bg-green-900/60 text-green-300 border-green-700 text-xs">FIN</Badge>
-  if (match.status === 'IN_PLAY' || match.status === 'PAUSED') return (
-    <Badge className="bg-red-900/60 text-red-300 border-red-700 text-xs animate-live-pulse">EN VIVO</Badge>
-  )
-  if (locked) return <Badge variant="destructive" className="text-xs">CERRADO</Badge>
-  return null
+  if (match.status === 'FINISHED')
+    return <Badge className="bg-green-900/60 text-green-300 border-green-700 text-xs">Finalizado</Badge>
+  if (match.status === 'IN_PLAY')
+    return <Badge className="bg-red-900/60 text-red-300 border-red-700 text-xs animate-live-pulse">● En Vivo</Badge>
+  if (match.status === 'PAUSED')
+    return <Badge className="bg-yellow-900/60 text-yellow-300 border-yellow-700 text-xs animate-live-pulse">Entretiempo</Badge>
+  if (locked)
+    return <Badge variant="destructive" className="text-xs">Cerrado</Badge>
+  return <Badge variant="outline" className="text-xs text-muted-foreground border-border/50">Por jugar</Badge>
 }
 
 export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api', lockMode = 'match' }: Props) {
@@ -336,6 +339,19 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
                       <div className="text-xs text-muted-foreground mt-0.5">
                         Tu: {pred.s1}-{pred.s2}
                       </div>
+                    )}
+                  </div>
+                </div>
+              ) : (match.status === 'IN_PLAY' || match.status === 'PAUSED') ? (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="text-xl font-bold font-mono text-primary">
+                    {match.score1 ?? '?'} - {match.score2 ?? '?'}
+                  </div>
+                  <div className="text-right">
+                    {pred ? (
+                      <div className="text-xs text-muted-foreground">Tu: {pred.s1}-{pred.s2}</div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin pronóstico</span>
                     )}
                   </div>
                 </div>

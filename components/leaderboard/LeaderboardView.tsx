@@ -55,7 +55,10 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
                   </AvatarFallback>
                 </Avatar>
                 <p className="text-xs font-semibold mt-1 max-w-20 truncate text-center">{entry.name}</p>
-                <p className="text-sm font-black text-primary">{entry.totalPoints} pts</p>
+                <p className="text-sm font-black text-primary">
+                  {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints} pts
+                  {entry.livePoints > 0 && <span className="text-yellow-400/90 text-xs ml-1">+{entry.livePoints}</span>}
+                </p>
               </div>
               <div
                 className={`w-20 rounded-t-xl flex items-center justify-center ${heights}`}
@@ -199,7 +202,7 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                     {isMe && <Badge className="text-xs bg-primary/20 text-primary border-primary/30 shrink-0">Tú</Badge>}
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
-                    <span title="Partidos">⚽ {entry.matchPoints}</span>
+                    <span title="Partidos">⚽ {entry.matchPoints + entry.pendingPoints}</span>
                     <span title="Grupos">🏅 {entry.groupPoints}</span>
                     <span title="Especiales">⭐ {entry.specialPoints}</span>
                     <span className="text-muted-foreground/60 hidden sm:inline">
@@ -209,8 +212,14 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
                 </div>
 
                 <div className="text-right shrink-0">
-                  <p className="font-black text-lg text-primary font-mono">{entry.totalPoints}</p>
-                  <p className="text-xs text-muted-foreground">pts</p>
+                  <p className="font-black text-lg text-primary font-mono">
+                    {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints}
+                  </p>
+                  {entry.livePoints > 0 ? (
+                    <p className="text-xs font-semibold text-yellow-400/90">+{entry.livePoints} en juego</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">pts</p>
+                  )}
                 </div>
               </div>
             </Card>
@@ -218,9 +227,15 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
         })}
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Actualización automática cada 30s
-      </p>
+      <div className="text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+        {entries.some(e => e.hasLiveMatches) && (
+          <span className="flex items-center gap-1 text-yellow-400/80 font-medium">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-live-pulse" />
+            Puntos en juego
+          </span>
+        )}
+        <span>· Actualización automática cada 30s</span>
+      </div>
     </div>
   )
 }

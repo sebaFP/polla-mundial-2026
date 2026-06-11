@@ -110,7 +110,14 @@ function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; use
               {entry.name}
               {isMe && <span className="ml-1.5 text-xs text-primary font-normal">(tú)</span>}
             </span>
-            <span className="font-black text-primary font-mono text-sm shrink-0">{entry.totalPoints}</span>
+            <div className="text-right shrink-0">
+              <span className="font-black text-primary font-mono text-sm">
+                {entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints}
+              </span>
+              {entry.livePoints > 0 && (
+                <span className="block text-xs text-yellow-400/90 font-semibold">+{entry.livePoints}</span>
+              )}
+            </div>
           </div>
         )
       })}
