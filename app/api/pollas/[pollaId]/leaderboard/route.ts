@@ -170,10 +170,13 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   }
 
   const liveGroupPtsMap: Record<string, number> = {}
-  // hasLiveGroups = true whenever any group prediction is still unscored and the group isn't locked
-  const hasLiveGroups = allGroupPreds.some(
+  // hasLiveGroups = true only when:
+  // 1. At least one unlocked group has actual standings data (a match was played)
+  // 2. At least one group prediction is still unscored in an unlocked group
+  const hasUnscoredGroupPreds = allGroupPreds.some(
     p => !lockedGroups.has(p.groupName) && (p.pointsFirst === null || p.pointsFirst === undefined)
   )
+  const hasLiveGroups = Object.keys(currentGroupLeaders).length > 0 && hasUnscoredGroupPreds
 
   for (const pred of allGroupPreds) {
     if (lockedGroups.has(pred.groupName)) continue
