@@ -16,18 +16,29 @@ export default async function PollaAdminsPage({ params }: { params: Promise<{ sl
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
-  const admins = await db.select({
-    userId: pollaMembers.userId,
-    role: pollaMembers.role,
-    inscriptionStatus: pollaMembers.inscriptionStatus,
-    joinedAt: pollaMembers.joinedAt,
-    name: users.name,
-    email: users.email,
-    avatarColor: users.avatarColor,
-  })
-    .from(pollaMembers)
-    .innerJoin(users, eq(pollaMembers.userId, users.id))
-    .where(and(eq(pollaMembers.pollaId, polla.id), eq(pollaMembers.role, 'admin')))
+  const [admins, participants] = await Promise.all([
+    db.select({
+      userId: pollaMembers.userId,
+      role: pollaMembers.role,
+      inscriptionStatus: pollaMembers.inscriptionStatus,
+      joinedAt: pollaMembers.joinedAt,
+      name: users.name,
+      email: users.email,
+      avatarColor: users.avatarColor,
+    })
+      .from(pollaMembers)
+      .innerJoin(users, eq(pollaMembers.userId, users.id))
+      .where(and(eq(pollaMembers.pollaId, polla.id), eq(pollaMembers.role, 'admin'))),
+    db.select({
+      userId: pollaMembers.userId,
+      name: users.name,
+      email: users.email,
+      avatarColor: users.avatarColor,
+    })
+      .from(pollaMembers)
+      .innerJoin(users, eq(pollaMembers.userId, users.id))
+      .where(and(eq(pollaMembers.pollaId, polla.id), eq(pollaMembers.role, 'participant'))),
+  ])
 
   return (
     <div className="space-y-6">
@@ -40,7 +51,9 @@ export default async function PollaAdminsPage({ params }: { params: Promise<{ sl
       <PollaAdminsManager
         pollaId={polla.id}
         initialAdmins={admins}
+        initialParticipants={participants}
         currentUserId={session.userId}
+        pollaCreatedBy={polla.createdBy}
       />
     </div>
   )
