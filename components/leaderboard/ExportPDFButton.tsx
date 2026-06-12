@@ -84,14 +84,12 @@ export default function ExportPDFButton({
         rr > 0 ? doc.roundedRect(x, y, w, h, rr, rr, 'S') : doc.rect(x, y, w, h, 'S')
       }
 
-      // charSpace must be set via setCharSpace BEFORE text() for correct align:'center' math
       const txt = (text: string, x: number, y: number, opts: {
         align?: 'left'|'center'|'right'
         size?: number
         bold?: boolean
         italic?: boolean
         color?: string
-        charSpace?: number
         maxWidth?: number
       } = {}) => {
         if (opts.color)     setTxt(opts.color)
@@ -99,12 +97,10 @@ export default function ExportPDFButton({
         if (opts.bold)      doc.setFont('helvetica', 'bold')
         else if (opts.italic) doc.setFont('helvetica', 'italic')
         else                doc.setFont('helvetica', 'normal')
-        if (opts.charSpace) doc.setCharSpace(opts.charSpace)
         const textOpts: { align?: 'left'|'center'|'right'; maxWidth?: number } = {}
         if (opts.align)    textOpts.align = opts.align
         if (opts.maxWidth) textOpts.maxWidth = opts.maxWidth
         doc.text(text, x, y, textOpts)
-        if (opts.charSpace) doc.setCharSpace(0)
       }
 
       function stripe(y: number) {
@@ -146,8 +142,8 @@ export default function ExportPDFButton({
       pageBackground()
       stripe(0)
 
-      txt('FIFA WORLD CUP 2026', CX, 19, {
-        align: 'center', size: 9, bold: true, color: C.gold, charSpace: 2,
+      txt('FIFA  WORLD  CUP  2026', CX, 19, {
+        align: 'center', size: 9, bold: true, color: C.gold,
       })
 
       const pollaLabel = pdfSafe(pollaName).toUpperCase()
@@ -159,8 +155,8 @@ export default function ExportPDFButton({
       const divY = 32 + (pollaLines.length - 1) * 10 + 8
       rect(20, divY, W - 40, 0.6, C.gold)
 
-      txt('TABLA DE POSICIONES', CX, divY + 8, {
-        align: 'center', size: 8, bold: true, color: C.goldLt, charSpace: 1.5,
+      txt('TABLA  DE  POSICIONES', CX, divY + 8, {
+        align: 'center', size: 8, bold: true, color: C.goldLt,
       })
 
       const now = new Date()
@@ -178,8 +174,8 @@ export default function ExportPDFButton({
       rect(podL, cy, podW, podH, C.card, 4)
       border(podL, cy, podW, podH, C.border, 4)
 
-      txt('PODIO', CX, cy + 8, {
-        align: 'center', size: 8, bold: true, color: C.gold, charSpace: 2,
+      txt('P  O  D  I  O', CX, cy + 8, {
+        align: 'center', size: 8, bold: true, color: C.gold,
       })
 
       const top3 = entries.slice(0, 3)
@@ -246,8 +242,8 @@ export default function ExportPDFButton({
         rect(podL, cy, podW, ph, C.card, 3)
         border(podL, cy, podW, ph, C.border, 3)
 
-        txt('POZO TOTAL', CX, cy + 7, {
-          align: 'center', size: 7, color: C.gray, charSpace: 1,
+        txt('POZO  TOTAL', CX, cy + 7, {
+          align: 'center', size: 7, color: C.gray,
         })
         txt(fmtAmt(totalPool, currency), CX, cy + 15, {
           align: 'center', size: 14, bold: true, color: C.gold,
@@ -272,8 +268,8 @@ export default function ExportPDFButton({
       }
 
       // ── TOP 10 LIST ───────────────────────────────────────────────────────
-      txt('CLASIFICACION GENERAL', podL + 2, cy + 1, {
-        size: 8, bold: true, color: C.goldLt, charSpace: 1.5,
+      txt('CLASIFICACION  GENERAL', podL + 2, cy + 1, {
+        size: 8, bold: true, color: C.goldLt,
       })
       rect(podL, cy + 3, podW, 0.4, C.gold)
       cy += 8
@@ -329,14 +325,14 @@ export default function ExportPDFButton({
         pageBackground()
         stripe(0)
 
-        txt('FIFA WORLD CUP 2026', CX, 14, {
-          align: 'center', size: 8, bold: true, color: C.gold, charSpace: 1.5,
+        txt('FIFA  WORLD  CUP  2026', CX, 14, {
+          align: 'center', size: 8, bold: true, color: C.gold,
         })
         txt(pdfSafe(pollaName).toUpperCase(), CX, 24, {
           align: 'center', size: 14, bold: true, color: C.white,
         })
-        txt('CLASIFICACION DETALLADA', CX, 32, {
-          align: 'center', size: 8, bold: true, color: C.goldLt, charSpace: 1,
+        txt('CLASIFICACION  DETALLADA', CX, 32, {
+          align: 'center', size: 8, bold: true, color: C.goldLt,
         })
 
         rect(14, 35, W - 28, 0.5, C.gold)
