@@ -216,6 +216,10 @@ export default function ExportPDFButton({
         doc.text(`${entry.rank}°`, px, podiumBarY[i] + podiumBarH[i] / 2 + 3, { align: 'center' })
       })
 
+      // Floor — thin gold bar spanning all three columns
+      fill(C.gold)
+      doc.rect(W / 2 - 48 - 14, barBottom, 28 + 48 * 2 + 28, 1.5, 'F')
+
       cy += podiumH + 8
 
       // ── PRIZE POOL BOX ────────────────────────────────────────────────────
