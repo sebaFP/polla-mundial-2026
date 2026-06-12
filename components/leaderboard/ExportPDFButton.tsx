@@ -152,7 +152,7 @@ export default function ExportPDFButton({
       let cy = divY + 22
 
       // ── PODIUM BOX ────────────────────────────────────────────────────────
-      const podiumH = 65
+      const podiumH = 70
       bg(14, cy, W - 28, podiumH, C.navyCard, 4)
       stroke(C.border)
       doc.setLineWidth(0.3)
@@ -169,10 +169,12 @@ export default function ExportPDFButton({
       // Order: 2nd | 1st | 3rd
       const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
       const podiumX = [W / 2 - 48, W / 2, W / 2 + 48]
-      // Bars all end at cy+61; heights differ by rank (1st tallest)
-      const barBottom = cy + podiumH - 4            // cy + 61
-      const podiumBarH = [12, 16, 8]                // [2nd, 1st, 3rd]
+      // Bars all end at cy+66; pronounced height difference so 1st stands out clearly
+      const barBottom = cy + podiumH - 4            // cy + 66
+      const barW = 28
+      const podiumBarH = [14, 22, 9]                // [2nd, 1st, 3rd]
       const podiumBarY = podiumBarH.map(h => barBottom - h)
+      // 1st: cy+44–cy+66 (22mm) | 2nd: cy+52–cy+66 (14mm) | 3rd: cy+57–cy+66 (9mm)
 
       podiumOrder.forEach((entry, i) => {
         const px = podiumX[i]
@@ -206,9 +208,8 @@ export default function ExportPDFButton({
         doc.setFontSize(6)
         doc.text('pts', px, cy + 42, { align: 'center' })
 
-        // Podium bar — starts at cy+45/cy+49/cy+53, safely below pts text
+        // Podium bar — starts well below pts text (cy+42), no overlap
         doc.setFillColor(r, g, b)
-        const barW = 28
         doc.roundedRect(px - barW / 2, podiumBarY[i], barW, podiumBarH[i], 2, 2, 'F')
         textCol(C.white)
         doc.setFontSize(9)
@@ -216,9 +217,9 @@ export default function ExportPDFButton({
         doc.text(`${entry.rank}°`, px, podiumBarY[i] + podiumBarH[i] / 2 + 3, { align: 'center' })
       })
 
-      // Floor — thin gold bar spanning all three columns
+      // Floor — gold bar spanning exactly the three podium columns
       fill(C.gold)
-      doc.rect(W / 2 - 48 - 14, barBottom, 28 + 48 * 2 + 28, 1.5, 'F')
+      doc.rect(podiumX[0] - barW / 2, barBottom, (podiumX[2] - podiumX[0]) + barW, 2, 'F')
 
       cy += podiumH + 8
 
@@ -262,7 +263,7 @@ export default function ExportPDFButton({
         cy += prizeH + 8
       }
 
-      // ── TOP 10 LIST ───────────────────────────────────────────────────────
+      // ── CLASIFICACION GENERAL (all that fit on page 1) ───────────────────
       textCol(C.goldLight)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
@@ -272,10 +273,14 @@ export default function ExportPDFButton({
       doc.rect(20, cy + 3, W - 40, 0.4, 'F')
       cy += 7
 
-      const top10 = entries.slice(0, Math.min(10, entries.length))
-      top10.forEach((entry, i) => {
-        const rowY = cy + i * 9
-        if (i % 2 === 0) bg(14, rowY - 3.5, W - 28, 9, C.navyRow)
+      // Show as many rows as fit before the footer — no arbitrary cap of 10
+      const ROW_H1 = 8
+      const maxRowsP1 = Math.max(1, Math.floor((284 - cy) / ROW_H1))
+      const page1Entries = entries.slice(0, Math.min(maxRowsP1, entries.length))
+
+      page1Entries.forEach((entry, i) => {
+        const rowY = cy + i * ROW_H1
+        if (i % 2 === 0) bg(14, rowY - 3, W - 28, ROW_H1, C.navyRow)
 
         const confirmed = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
         const color = rankColor(entry.rank)
@@ -298,25 +303,28 @@ export default function ExportPDFButton({
         textCol(C.border)
         doc.setFontSize(7)
         doc.setFont('helvetica', 'normal')
-        const pts = `${confirmed} pts`
-        const ptsW = doc.getTextWidth(pts)
         doc.text('· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·', 90, rowY + 2, {})
 
         // Points
+        const pts = `${confirmed} pts`
         textCol(color)
         doc.setFontSize(8.5)
         doc.setFont('helvetica', 'bold')
         doc.text(pts, W - 22, rowY + 2.5, { align: 'right' })
       })
 
-      cy += top10.length * 9 + 4
+      cy += page1Entries.length * ROW_H1 + 4
 
-      // Participant count
-      if (entries.length > 10) {
+      // Note if there are more entries on the following pages
+      const remaining = entries.length - page1Entries.length
+      if (remaining > 0) {
         textCol(C.gray)
         doc.setFontSize(7)
         doc.setFont('helvetica', 'italic')
-        doc.text(`+ ${entries.length - 10} participantes más — ver página siguiente`, W / 2, cy + 2, { align: 'center' })
+        doc.text(
+          `+ ${remaining} participante${remaining > 1 ? 's' : ''} mas en la tabla detallada (pag. siguiente)`,
+          W / 2, cy + 2, { align: 'center' }
+        )
       }
 
       stripeFooter()
@@ -326,9 +334,9 @@ export default function ExportPDFButton({
       doc.text('Página 1', W / 2, 293, { align: 'center' })
 
       // ── PAGE 2+: Full Leaderboard Table ──────────────────────────────────
-      const ROW_H = 8.5
+      const ROW_H = 8
       const TABLE_TOP = 38
-      const PAGE_BOTTOM = 282
+      const PAGE_BOTTOM = 284
       const COLS = {
         rank:    { x: 14,  w: 10,  label: '#',      align: 'center' as const },
         name:    { x: 27,  w: 72,  label: 'Nombre', align: 'left' as const },
