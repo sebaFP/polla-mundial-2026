@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Radio, Trophy } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 function Wordmark() {
   return (
@@ -73,9 +72,12 @@ export default function PublicPollaNav({
               })}
             </div>
 
-            <Button asChild size="sm" className="shrink-0 text-xs font-semibold">
-              <Link href="/login">Iniciar sesión</Link>
-            </Button>
+            <Link
+              href="/login"
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Iniciar sesión
+            </Link>
 
           </div>
         </div>
