@@ -97,9 +97,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ to
       }
     }
 
-    // Transfer invitation ownership and mark used
+    // Transfer invitation ownership, mark used, and expire (blocks reuse after reassignment)
     await tx.update(invitations)
-      .set({ userId: currentUserId, usedAt: new Date() })
+      .set({ userId: currentUserId, usedAt: new Date(), expiresAt: new Date() })
       .where(eq(invitations.token, token))
 
     // Delete synthetic user — cascades remaining FK refs
