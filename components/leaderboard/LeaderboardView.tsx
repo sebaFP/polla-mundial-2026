@@ -84,7 +84,7 @@ function Podium({ entries, showLive, showLiveGroups }: { entries: LeaderboardEnt
 }
 
 type Props = {
-  currentUserId: string
+  currentUserId: string | null
   pollaId: string
   pollaName: string
   prizePoolEnabled: boolean

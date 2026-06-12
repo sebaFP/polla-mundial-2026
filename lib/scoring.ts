@@ -147,4 +147,5 @@ export const DEFAULT_CONFIG: Config = {
   admin_fee_enabled: 'false',
   admin_fee_type: 'percentage',
   admin_fee_value: '0',
+  polla_visibility: 'private',
 }

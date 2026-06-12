@@ -413,6 +413,33 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
 
           <Card className="glass-card">
             <CardHeader>
+              <CardTitle className="text-sm">🌐 Visibilidad</CardTitle>
+              <CardDescription className="text-xs">Controla quién puede ver la tabla de posiciones</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => update('polla_visibility', 'private')}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${config.polla_visibility !== 'public' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-muted-foreground'}`}
+                >
+                  <p className="text-sm font-medium">🔒 Privada</p>
+                  <p className="text-xs mt-0.5 opacity-80">Solo miembros pueden ver</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => update('polla_visibility', 'public')}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${config.polla_visibility === 'public' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-muted-foreground'}`}
+                >
+                  <p className="text-sm font-medium">🌍 Pública</p>
+                  <p className="text-xs mt-0.5 opacity-80">Tabla visible sin iniciar sesión</p>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
               <CardTitle className="text-sm">🔧 Funcionalidades</CardTitle>
               <CardDescription className="text-xs">Activa o desactiva categorías de pronósticos</CardDescription>
             </CardHeader>

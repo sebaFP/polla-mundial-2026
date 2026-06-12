@@ -29,15 +29,19 @@ export type LeaderboardEntry = {
 type RouteContext = { params: Promise<{ pollaId: string }> }
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { pollaId } = await params
   const polla = await getPollaById(pollaId)
   if (!polla) return NextResponse.json({ error: 'Polla no encontrada' }, { status: 404 })
 
-  const myRole = await getMemberRole(pollaId, session.userId)
-  if (!myRole) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const config = await getPollaConfig(pollaId)
+  const isPublic = config.polla_visibility === 'public'
+
+  if (!isPublic) {
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const myRole = await getMemberRole(pollaId, session.userId)
+    if (!myRole) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const matchPts = await db
     .select({
@@ -103,8 +107,6 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const pendingPtsMap: Record<string, number> = {}
   const livePtsMap: Record<string, number> = {}
   let hasLive = false
-
-  const config = await getPollaConfig(pollaId)
 
   if (activeMatchIds.length > 0) {
     const [livePreds, overrides] = await Promise.all([

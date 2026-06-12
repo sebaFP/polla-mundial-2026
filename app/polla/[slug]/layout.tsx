@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { getPollaBySlug, getMemberRole } from '@/lib/polla'
+import { getPollaBySlug, getMemberRole, getPollaConfig } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import PollaNav from '@/components/PollaNav'
 import { db } from '@/lib/db'
@@ -14,9 +14,29 @@ export default async function PollaLayout({
   params: Promise<{ slug: string }>
 }) {
   const session = await getSession()
-  if (!session) redirect('/login')
-
   const { slug } = await params
+
+  if (!session) {
+    // Unauthenticated: only allow public leaderboard
+    const polla = await getPollaBySlug(slug)
+    if (!polla) redirect('/')
+
+    const config = await getPollaConfig(polla.id)
+    if (config.polla_visibility !== 'public') redirect('/login')
+
+    // Public read-only layout — no nav, no membership check
+    return (
+      <div className="relative min-h-screen gradient-bg overflow-x-hidden">
+        <div className="pattern-geo absolute inset-0" aria-hidden />
+        <div className="relative z-10">
+          <main className="container mx-auto px-4 py-6 max-w-6xl">
+            {children}
+          </main>
+        </div>
+      </div>
+    )
+  }
+
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
