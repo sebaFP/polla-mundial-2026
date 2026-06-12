@@ -4,33 +4,24 @@ import { useState } from 'react'
 import { Download } from 'lucide-react'
 import type { LeaderboardEntry } from '@/app/api/pollas/[pollaId]/leaderboard/route'
 
-// ── Design tokens (mirrors app globals.css) ─────────────────────────────────
 const C = {
-  navy:      '#0A0E1A',
-  navyCard:  '#131929',
-  navyRow:   '#0F1522',
-  gold:      '#D4A843',
-  goldLight: '#ECC261',
-  white:     '#F2F2F2',
-  gray:      '#7A8499',
-  grayLight: '#9BA5BE',
-  red:       '#E61D25',   // FIFA Canada red
-  blue:      '#2A398D',   // FIFA USA blue
-  green:     '#3CAC3B',   // FIFA Mexico green
-  border:    '#1E2840',
+  navy:     '#0A0E1A',
+  card:     '#131929',
+  row:      '#0F1522',
+  gold:     '#D4A843',
+  goldLt:   '#ECC261',
+  white:    '#F2F2F2',
+  gray:     '#7A8499',
+  grayLt:   '#9BA5BE',
+  red:      '#E61D25',
+  blue:     '#2A398D',
+  green:    '#3CAC3B',
+  border:   '#1E2840',
 }
 
-function hex2rgb(hex: string): [number, number, number] {
+function rgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ]
-}
-
-function formatAmt(n: number, currency: string) {
-  return `${currency} ${n.toLocaleString('es-CL')}`
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]
 }
 
 function rankColor(rank: number) {
@@ -40,9 +31,16 @@ function rankColor(rank: number) {
   return C.gray
 }
 
-// Strip diacritics so jsPDF/Helvetica renders names without encoding artifacts
-function pdfText(str: string): string {
+function pdfSafe(str: string): string {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x00-\xFF]/g, '')
+}
+
+function fmtAmt(n: number, currency: string) {
+  return `${currency} ${n.toLocaleString('es-CL')}`
+}
+
+function totalPts(e: LeaderboardEntry) {
+  return e.matchPoints + e.pendingPoints + e.groupPoints + e.specialPoints + e.questionPoints
 }
 
 type Props = {
@@ -69,401 +67,357 @@ export default function ExportPDFButton({
     try {
       const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const W = 210
+      const W = 210, H = 297, CX = W / 2  // center x = 105
 
-      // ── helpers ──────────────────────────────────────────────────────────
-      const fill = (hex: string) => { const [r,g,b] = hex2rgb(hex); doc.setFillColor(r,g,b) }
-      const stroke = (hex: string) => { const [r,g,b] = hex2rgb(hex); doc.setDrawColor(r,g,b) }
-      const textCol = (hex: string) => { const [r,g,b] = hex2rgb(hex); doc.setTextColor(r,g,b) }
-      const bg = (x: number, y: number, w: number, h: number, hex: string, r = 0) => {
-        fill(hex)
-        if (r > 0) doc.roundedRect(x, y, w, h, r, r, 'F')
-        else doc.rect(x, y, w, h, 'F')
+      // ── primitives ────────────────────────────────────────────────────────
+      const setFill  = (hex: string) => { const [r,g,b] = rgb(hex); doc.setFillColor(r,g,b) }
+      const setStroke= (hex: string) => { const [r,g,b] = rgb(hex); doc.setDrawColor(r,g,b) }
+      const setTxt   = (hex: string) => { const [r,g,b] = rgb(hex); doc.setTextColor(r,g,b) }
+
+      const rect = (x: number, y: number, w: number, h: number, hex: string, rr = 0) => {
+        setFill(hex)
+        rr > 0 ? doc.roundedRect(x, y, w, h, rr, rr, 'F') : doc.rect(x, y, w, h, 'F')
+      }
+      const border = (x: number, y: number, w: number, h: number, hex: string, rr = 0) => {
+        setStroke(hex)
+        doc.setLineWidth(0.3)
+        rr > 0 ? doc.roundedRect(x, y, w, h, rr, rr, 'S') : doc.rect(x, y, w, h, 'S')
       }
 
-      function stripeHeader(y = 0) {
-        bg(0, y, W / 3, 4, C.red)
-        bg(W / 3, y, W / 3, 4, C.blue)
-        bg(W * 2 / 3, y, W / 3 + 1, 4, C.green)
+      // charSpace must be set via setCharSpace BEFORE text() for correct align:'center' math
+      const txt = (text: string, x: number, y: number, opts: {
+        align?: 'left'|'center'|'right'
+        size?: number
+        bold?: boolean
+        italic?: boolean
+        color?: string
+        charSpace?: number
+        maxWidth?: number
+      } = {}) => {
+        if (opts.color)     setTxt(opts.color)
+        if (opts.size)      doc.setFontSize(opts.size)
+        if (opts.bold)      doc.setFont('helvetica', 'bold')
+        else if (opts.italic) doc.setFont('helvetica', 'italic')
+        else                doc.setFont('helvetica', 'normal')
+        if (opts.charSpace) doc.setCharSpace(opts.charSpace)
+        const textOpts: { align?: 'left'|'center'|'right'; maxWidth?: number } = {}
+        if (opts.align)    textOpts.align = opts.align
+        if (opts.maxWidth) textOpts.maxWidth = opts.maxWidth
+        doc.text(text, x, y, textOpts)
+        if (opts.charSpace) doc.setCharSpace(0)
       }
 
-      function pageFooter(pageNum: number, total: number) {
-        const H = 297
-        stripeFooter()
-        textCol(C.gray)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'normal')
-        doc.text(`Página ${pageNum} de ${total}`, W / 2, H - 3, { align: 'center' })
+      function stripe(y: number) {
+        rect(0,     y, W/3,     5, C.red)
+        rect(W/3,   y, W/3,     5, C.blue)
+        rect(W*2/3, y, W/3 + 1, 5, C.green)
       }
 
-      function stripeFooter() {
-        bg(0, 290, W / 3, 4, C.red)
-        bg(W / 3, 290, W / 3, 4, C.blue)
-        bg(W * 2 / 3, 290, W / 3 + 1, 4, C.green)
+      function dotGrid() {
+        setFill(C.border)
+        for (let x = 15; x < W; x += 18)
+          for (let y = 15; y < H; y += 18)
+            doc.circle(x, y, 0.4, 'F')
       }
 
-      // ── PAGE 1: Executive Summary ─────────────────────────────────────────
-      bg(0, 0, W, 297, C.navy)
-
-      // Subtle geometric grid (FIFA 2026 motif - tiny dots)
-      fill(C.border)
-      for (let gx = 15; gx < W; gx += 18) {
-        for (let gy = 15; gy < 297; gy += 18) {
-          doc.circle(gx, gy, 0.4, 'F')
-        }
+      function pageBackground() {
+        rect(0, 0, W, H, C.navy)
+        dotGrid()
       }
 
-      stripeHeader(0)
+      // ── pre-calculate pagination ──────────────────────────────────────────
+      const ROW_H       = 8.5
+      const TABLE_TOP   = 44   // first data row y
+      const PAGE_BOTTOM = 282
+      const rowsPerPage = Math.floor((PAGE_BOTTOM - TABLE_TOP) / ROW_H)
+      const detailPages = Math.ceil(entries.length / rowsPerPage)
+      const totalPages  = 1 + detailPages
 
-      // Trophy + competition label
-      textCol(C.gold)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.text('FIFA WORLD CUP 2026', W / 2, 20, { align: 'center', charSpace: 2 })
-      doc.setCharSpace(0)
+      function footer(pageNum: number) {
+        stripe(H - 7)
+        txt(`Página ${pageNum} de ${totalPages}`, CX, H - 1.5, {
+          align: 'center', size: 7, color: C.gray,
+        })
+      }
 
-      // Polla name
-      textCol(C.white)
-      doc.setFontSize(26)
-      doc.setFont('helvetica', 'bold')
-      const pollaLines = doc.splitTextToSize(pdfText(pollaName).toUpperCase(), 180)
-      doc.text(pollaLines, W / 2, 34, { align: 'center' })
+      // ══════════════════════════════════════════════════════════════════════
+      // PAGE 1 — Executive summary
+      // ══════════════════════════════════════════════════════════════════════
+      pageBackground()
+      stripe(0)
 
-      // Gold divider
-      const divY = 34 + pollaLines.length * 11
-      fill(C.gold)
-      doc.rect(20, divY, W - 40, 0.6, 'F')
-
-      // Subtitle row
-      textCol(C.goldLight)
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.text('TABLA DE POSICIONES', W / 2, divY + 7, { align: 'center', charSpace: 1.5 })
-      doc.setCharSpace(0)
-      textCol(C.gray)
-      doc.setFontSize(7)
-      doc.setFont('helvetica', 'normal')
-      const now = new Date()
-      doc.text(
-        `Generado el ${now.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })} a las ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`,
-        W / 2, divY + 13, { align: 'center' }
-      )
-
-      let cy = divY + 22
-
-      // ── PODIUM BOX ────────────────────────────────────────────────────────
-      const podiumH = 65
-      bg(14, cy, W - 28, podiumH, C.navyCard, 4)
-      stroke(C.border)
-      doc.setLineWidth(0.3)
-      doc.roundedRect(14, cy, W - 28, podiumH, 4, 4, 'S')
-
-      // "PODIO" label inside card
-      textCol(C.gold)
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.text('PODIO', W / 2, cy + 7, { align: 'center', charSpace: 2 })
-      doc.setCharSpace(0)
-
-      const top3 = entries.slice(0, 3)
-      // Order: 2nd | 1st | 3rd
-      const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
-      const podiumX = [W / 2 - 48, W / 2, W / 2 + 48]
-      // Bars all end at cy+61; heights differ by rank (1st tallest)
-      const barBottom = cy + podiumH - 4            // cy + 61
-      const podiumBarH = [12, 16, 8]                // [2nd, 1st, 3rd]
-      const podiumBarY = podiumBarH.map(h => barBottom - h)
-
-      podiumOrder.forEach((entry, i) => {
-        const px = podiumX[i]
-        const color = rankColor(entry.rank)
-        const [r,g,b] = hex2rgb(color)
-
-        // Avatar circle
-        doc.setFillColor(r, g, b)
-        doc.circle(px, cy + 20, 7, 'F')
-        textCol(C.white)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'bold')
-        const initials = pdfText(entry.name).slice(0, 2).toUpperCase()
-        doc.text(initials, px, cy + 22.5, { align: 'center' })
-
-        // Name
-        textCol(C.white)
-        doc.setFontSize(6.5)
-        doc.setFont('helvetica', 'bold')
-        const rawName = pdfText(entry.name)
-        const nameTrunc = rawName.length > 12 ? rawName.slice(0, 11) + '...' : rawName
-        doc.text(nameTrunc, px, cy + 31, { align: 'center' })
-
-        // Points
-        doc.setFontSize(11)
-        doc.setFont('helvetica', 'bold')
-        textCol(color)
-        const confirmed = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-        doc.text(`${confirmed}`, px, cy + 38, { align: 'center' })
-        textCol(C.gray)
-        doc.setFontSize(6)
-        doc.text('pts', px, cy + 42, { align: 'center' })
-
-        // Podium bar — starts at cy+45/cy+49/cy+53, safely below pts text
-        doc.setFillColor(r, g, b)
-        const barW = 28
-        doc.roundedRect(px - barW / 2, podiumBarY[i], barW, podiumBarH[i], 2, 2, 'F')
-        textCol(C.white)
-        doc.setFontSize(9)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${entry.rank}°`, px, podiumBarY[i] + podiumBarH[i] / 2 + 3, { align: 'center' })
+      txt('FIFA WORLD CUP 2026', CX, 19, {
+        align: 'center', size: 9, bold: true, color: C.gold, charSpace: 2,
       })
 
-      // Floor — thin gold bar spanning all three columns
-      fill(C.gold)
-      doc.rect(W / 2 - 48 - 14, barBottom, 28 + 48 * 2 + 28, 1.5, 'F')
+      const pollaLabel = pdfSafe(pollaName).toUpperCase()
+      const pollaLines = doc.splitTextToSize(pollaLabel, 180) as string[]
+      txt(pollaLabel, CX, 32, {
+        align: 'center', size: 26, bold: true, color: C.white, maxWidth: 180,
+      })
 
-      cy += podiumH + 8
+      const divY = 32 + (pollaLines.length - 1) * 10 + 8
+      rect(20, divY, W - 40, 0.6, C.gold)
 
-      // ── PRIZE POOL BOX ────────────────────────────────────────────────────
+      txt('TABLA DE POSICIONES', CX, divY + 8, {
+        align: 'center', size: 8, bold: true, color: C.goldLt, charSpace: 1.5,
+      })
+
+      const now = new Date()
+      const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
+      const timeStr = now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+      txt(`Generado el ${dateStr} a las ${timeStr}`, CX, divY + 15, {
+        align: 'center', size: 7, color: C.gray,
+      })
+
+      let cy = divY + 24
+
+      // ── PODIUM ────────────────────────────────────────────────────────────
+      const podH    = 68
+      const podL    = 14, podW = W - 28
+      rect(podL, cy, podW, podH, C.card, 4)
+      border(podL, cy, podW, podH, C.border, 4)
+
+      txt('PODIO', CX, cy + 8, {
+        align: 'center', size: 8, bold: true, color: C.gold, charSpace: 2,
+      })
+
+      const top3 = entries.slice(0, 3)
+      if (top3.length > 0) {
+        // order: [2nd, 1st, 3rd] — visual podium layout
+        const order = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
+        // space evenly within card content area (podL+4 … podL+podW-4)
+        const contentW = podW - 8
+        const step     = contentW / (order.length + 1)
+        const podXs    = order.map((_, i) => podL + 4 + step * (i + 1))
+
+        const barBottom = cy + podH - 5
+        const barHs     = order.length >= 3 ? [14, 20, 10] : [20]  // [2nd, 1st, 3rd]
+        const barW      = 26
+
+        order.forEach((entry, i) => {
+          const px    = podXs[i]
+          const color = rankColor(entry.rank)
+          const [r,g,b] = rgb(color)
+
+          // Avatar
+          doc.setFillColor(r, g, b)
+          doc.circle(px, cy + 21, 7, 'F')
+          txt(pdfSafe(entry.name).slice(0, 2).toUpperCase(), px, cy + 23.5, {
+            align: 'center', size: 7, bold: true, color: C.white,
+          })
+
+          // Name
+          const nameRaw = pdfSafe(entry.name)
+          const nameStr = nameRaw.length > 13 ? nameRaw.slice(0, 12) + '...' : nameRaw
+          txt(nameStr, px, cy + 32, {
+            align: 'center', size: 6.5, bold: true, color: C.white,
+          })
+
+          // Points
+          txt(`${totalPts(entry)}`, px, cy + 40, {
+            align: 'center', size: 12, bold: true, color,
+          })
+          txt('pts', px, cy + 44.5, {
+            align: 'center', size: 6, color: C.gray,
+          })
+
+          // Bar
+          const bh = barHs[i] ?? 14
+          const by = barBottom - bh
+          doc.setFillColor(r, g, b)
+          doc.roundedRect(px - barW/2, by, barW, bh, 2, 2, 'F')
+          txt(`${entry.rank}°`, px, by + bh/2 + 3, {
+            align: 'center', size: 9, bold: true, color: C.white,
+          })
+        })
+
+        // Gold floor bar spanning all columns
+        const floorX = podXs[0] - barW/2 - 2
+        const floorW = podXs[order.length - 1] - podXs[0] + barW + 4
+        rect(floorX, barBottom, floorW, 1.5, C.gold)
+      }
+
+      cy += podH + 8
+
+      // ── PRIZE POOL ────────────────────────────────────────────────────────
       if (prizePoolEnabled && totalPool > 0) {
-        const prizeH = 26
-        bg(14, cy, W - 28, prizeH, C.navyCard, 3)
-        stroke(C.border)
-        doc.setLineWidth(0.3)
-        doc.roundedRect(14, cy, W - 28, prizeH, 3, 3, 'S')
+        const ph = 28
+        rect(podL, cy, podW, ph, C.card, 3)
+        border(podL, cy, podW, ph, C.border, 3)
 
-        textCol(C.gray)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'normal')
-        doc.text('POZO TOTAL', W / 2, cy + 6, { align: 'center', charSpace: 1 })
+        txt('POZO TOTAL', CX, cy + 7, {
+          align: 'center', size: 7, color: C.gray, charSpace: 1,
+        })
+        txt(fmtAmt(totalPool, currency), CX, cy + 15, {
+          align: 'center', size: 14, bold: true, color: C.gold,
+        })
 
-        textCol(C.gold)
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.text(formatAmt(totalPool, currency), W / 2, cy + 14, { align: 'center' })
-
-        // Prize tiers
         const p1 = Math.round(totalPool * prize1Pct / 100)
         const p2 = Math.round(totalPool * prize2Pct / 100)
         const p3 = Math.round(totalPool * prize3Pct / 100)
-        const tierX = [W / 2 - 46, W / 2, W / 2 + 46]
-        const tierColors = [C.red, C.blue, C.green]
-        const tierLabels = ['1° lugar', '2° lugar', '3° lugar']
-        const tierAmts = [p1, p2, p3]
-        tierX.forEach((tx, i) => {
-          textCol(tierColors[i])
-          doc.setFontSize(7.5)
-          doc.setFont('helvetica', 'bold')
-          doc.text(formatAmt(tierAmts[i], currency), tx, cy + 21, { align: 'center' })
-          textCol(C.gray)
-          doc.setFontSize(6)
-          doc.setFont('helvetica', 'normal')
-          doc.text(tierLabels[i], tx, cy + 25, { align: 'center' })
+        const tierXs = [CX - 48, CX, CX + 48]
+        ;[p1, p2, p3].forEach((amt, i) => {
+          const colors = [C.red, C.blue, C.green]
+          const labels = ['1° lugar', '2° lugar', '3° lugar']
+          txt(fmtAmt(amt, currency), tierXs[i], cy + 22, {
+            align: 'center', size: 7, bold: true, color: colors[i],
+          })
+          txt(labels[i], tierXs[i], cy + 26, {
+            align: 'center', size: 6, color: C.gray,
+          })
         })
 
-        cy += prizeH + 8
+        cy += ph + 8
       }
 
       // ── TOP 10 LIST ───────────────────────────────────────────────────────
-      textCol(C.goldLight)
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.text('CLASIFICACION GENERAL', 20, cy + 1, { charSpace: 1.5 })
-      doc.setCharSpace(0)
-      fill(C.gold)
-      doc.rect(20, cy + 3, W - 40, 0.4, 'F')
-      cy += 7
+      txt('CLASIFICACION GENERAL', podL + 2, cy + 1, {
+        size: 8, bold: true, color: C.goldLt, charSpace: 1.5,
+      })
+      rect(podL, cy + 3, podW, 0.4, C.gold)
+      cy += 8
 
       const top10 = entries.slice(0, Math.min(10, entries.length))
       top10.forEach((entry, i) => {
-        const rowY = cy + i * 9
-        if (i % 2 === 0) bg(14, rowY - 3.5, W - 28, 9, C.navyRow)
+        const ry = cy + i * 9
+        if (i % 2 === 0) rect(podL, ry - 3.5, podW, 9, C.row)
 
-        const confirmed = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
         const color = rankColor(entry.rank)
+        const pts   = `${totalPts(entry)} pts`
 
-        // Rank
-        textCol(color)
-        doc.setFontSize(8)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${entry.rank}°`, 22, rowY + 2.5, { align: 'left' })
+        txt(`${entry.rank}°`, podL + 2, ry + 2.5, {
+          size: 8, bold: true, color,
+        })
 
-        // Name
-        textCol(C.white)
-        doc.setFontSize(8)
-        doc.setFont('helvetica', entry.rank <= 3 ? 'bold' : 'normal')
-        const rawName10 = pdfText(entry.name)
-        const name = rawName10.length > 28 ? rawName10.slice(0, 27) + '...' : rawName10
-        doc.text(name, 35, rowY + 2.5)
+        txt(pdfSafe(entry.name), podL + 14, ry + 2.5, {
+          size: 8, bold: entry.rank <= 3, color: C.white,
+          maxWidth: 100,
+        })
 
-        // Dotted line
-        textCol(C.border)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'normal')
-        const pts = `${confirmed} pts`
-        const ptsW = doc.getTextWidth(pts)
-        doc.text('· · · · · · · · · · · · · · · · · · · · · · · · · · · · · · · ·', 90, rowY + 2, {})
-
-        // Points
-        textCol(color)
-        doc.setFontSize(8.5)
-        doc.setFont('helvetica', 'bold')
-        doc.text(pts, W - 22, rowY + 2.5, { align: 'right' })
+        // Right-align score
+        txt(pts, W - podL - 2, ry + 2.5, {
+          align: 'right', size: 8, bold: entry.rank <= 3, color,
+        })
       })
 
-      cy += top10.length * 9 + 4
+      cy += top10.length * 9 + 5
 
-      // Participant count
       if (entries.length > 10) {
-        textCol(C.gray)
-        doc.setFontSize(7)
-        doc.setFont('helvetica', 'italic')
-        doc.text(`+ ${entries.length - 10} participantes más — ver página siguiente`, W / 2, cy + 2, { align: 'center' })
+        txt(`+ ${entries.length - 10} participantes más — ver página siguiente`, CX, cy + 2, {
+          align: 'center', size: 7, italic: true, color: C.gray,
+        })
       }
 
-      stripeFooter()
-      textCol(C.gray)
-      doc.setFontSize(7)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Página 1', W / 2, 293, { align: 'center' })
+      footer(1)
 
-      // ── PAGE 2+: Full Leaderboard Table ──────────────────────────────────
-      const ROW_H = 8.5
-      const TABLE_TOP = 38
-      const PAGE_BOTTOM = 282
-      const COLS = {
-        rank:    { x: 14,  w: 10,  label: '#',      align: 'center' as const },
-        name:    { x: 27,  w: 72,  label: 'Nombre', align: 'left' as const },
-        match:   { x: 102, w: 18,  label: 'Part.',  align: 'center' as const },
-        group:   { x: 122, w: 18,  label: 'Grup.',  align: 'center' as const },
-        special: { x: 142, w: 18,  label: 'Esp.',   align: 'center' as const },
-        quest:   { x: 162, w: 16,  label: 'Preg.',  align: 'center' as const },
-        total:   { x: 181, w: 15,  label: 'TOTAL',  align: 'center' as const },
-      }
+      // ══════════════════════════════════════════════════════════════════════
+      // PAGES 2+: Detailed table
+      // ══════════════════════════════════════════════════════════════════════
+      const COLS = [
+        { x: 14,  w: 12,  label: '#',      align: 'center' as const },
+        { x: 28,  w: 72,  label: 'Nombre', align: 'left'   as const },
+        { x: 103, w: 22,  label: 'Part.',  align: 'center' as const },
+        { x: 127, w: 22,  label: 'Grup.',  align: 'center' as const },
+        { x: 151, w: 18,  label: 'Esp.',   align: 'center' as const },
+        { x: 171, w: 14,  label: 'Preg.',  align: 'center' as const },
+        { x: 186, w: 10,  label: 'TOTAL',  align: 'center' as const },
+      ]
 
-      // Calculate total pages needed
-      const rowsPerPage = Math.floor((PAGE_BOTTOM - TABLE_TOP) / ROW_H)
-      const totalDetailPages = Math.ceil(entries.length / rowsPerPage)
-      const totalPages = 1 + totalDetailPages
-
-      function drawTablePage(startIdx: number, pageNum: number) {
+      for (let p = 0; p < detailPages; p++) {
         doc.addPage()
-        bg(0, 0, W, 297, C.navy)
+        pageBackground()
+        stripe(0)
 
-        // Subtle grid
-        fill(C.border)
-        for (let gx = 15; gx < W; gx += 18) {
-          for (let gy = 15; gy < 297; gy += 18) {
-            doc.circle(gx, gy, 0.4, 'F')
-          }
-        }
-
-        stripeHeader(0)
-
-        // Page header
-        textCol(C.gold)
-        doc.setFontSize(8)
-        doc.setFont('helvetica', 'bold')
-        doc.text('FIFA WORLD CUP 2026', W / 2, 12, { align: 'center', charSpace: 1.5 })
-        doc.setCharSpace(0)
-        textCol(C.white)
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.text(pdfText(pollaName).toUpperCase(), W / 2, 22, { align: 'center' })
-        textCol(C.goldLight)
-        doc.setFontSize(8)
-        doc.setFont('helvetica', 'bold')
-        doc.text('CLASIFICACION DETALLADA', W / 2, 30, { align: 'center', charSpace: 1 })
-        doc.setCharSpace(0)
-
-        fill(C.gold)
-        doc.rect(14, 33, W - 28, 0.5, 'F')
-
-        // Column headers
-        bg(14, TABLE_TOP - ROW_H, W - 28, ROW_H, C.navyCard)
-        stroke(C.border)
-        doc.setLineWidth(0.3)
-        doc.roundedRect(14, TABLE_TOP - ROW_H, W - 28, ROW_H, 1, 1, 'S')
-
-        Object.values(COLS).forEach(col => {
-          textCol(C.goldLight)
-          doc.setFontSize(6.5)
-          doc.setFont('helvetica', 'bold')
-          const tx = col.align === 'center' ? col.x + col.w / 2 : col.x + 1
-          doc.text(col.label, tx, TABLE_TOP - ROW_H + 5.5, { align: col.align })
+        txt('FIFA WORLD CUP 2026', CX, 14, {
+          align: 'center', size: 8, bold: true, color: C.gold, charSpace: 1.5,
+        })
+        txt(pdfSafe(pollaName).toUpperCase(), CX, 24, {
+          align: 'center', size: 14, bold: true, color: C.white,
+        })
+        txt('CLASIFICACION DETALLADA', CX, 32, {
+          align: 'center', size: 8, bold: true, color: C.goldLt, charSpace: 1,
         })
 
-        // Rows
-        const pageEntries = entries.slice(startIdx, startIdx + rowsPerPage)
-        pageEntries.forEach((entry, i) => {
-          const rowY = TABLE_TOP + i * ROW_H
-          const odd = i % 2 === 0
-          bg(14, rowY - 0.5, W - 28, ROW_H, odd ? C.navyRow : C.navy)
+        rect(14, 35, W - 28, 0.5, C.gold)
 
-          // Left accent bar for top 3
+        // Column header row
+        const hY = TABLE_TOP - ROW_H
+        rect(14, hY, W - 28, ROW_H, C.card)
+        border(14, hY, W - 28, ROW_H, C.border)
+
+        COLS.forEach(col => {
+          const tx = col.align === 'center' ? col.x + col.w / 2 : col.x + 1
+          txt(col.label, tx, hY + 5.5, {
+            align: col.align, size: 6.5, bold: true, color: C.goldLt,
+          })
+        })
+
+        // Data rows
+        const pageSlice = entries.slice(p * rowsPerPage, (p + 1) * rowsPerPage)
+        pageSlice.forEach((entry, i) => {
+          const ry   = TABLE_TOP + i * ROW_H
+          const midY = ry + ROW_H / 2 + 1.5
+          const color = rankColor(entry.rank)
+          const pts   = totalPts(entry)
+
+          rect(14, ry - 0.5, W - 28, ROW_H, i % 2 === 0 ? C.row : C.navy)
+
+          // Color accent bar for top 3
           if (entry.rank <= 3) {
-            const [r,g,b] = hex2rgb(rankColor(entry.rank))
+            const [r,g,b] = rgb(color)
             doc.setFillColor(r, g, b)
-            doc.rect(14, rowY - 0.5, 1.5, ROW_H, 'F')
+            doc.rect(14, ry - 0.5, 1.5, ROW_H, 'F')
           }
-
-          const midY = rowY + ROW_H / 2 + 1.5
-          const confirmed = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
 
           // Rank
-          textCol(rankColor(entry.rank))
-          doc.setFontSize(entry.rank <= 3 ? 9 : 8)
-          doc.setFont('helvetica', 'bold')
-          doc.text(`${entry.rank}°`, COLS.rank.x + COLS.rank.w / 2, midY, { align: 'center' })
+          txt(`${entry.rank}°`, COLS[0].x + COLS[0].w / 2, midY, {
+            align: 'center', size: entry.rank <= 3 ? 9 : 8, bold: true, color,
+          })
 
           // Name
-          textCol(C.white)
-          doc.setFontSize(8)
-          doc.setFont('helvetica', entry.rank <= 3 ? 'bold' : 'normal')
-          const rawNameT = pdfText(entry.name)
-          const nameStr = rawNameT.length > 22 ? rawNameT.slice(0, 21) + '...' : rawNameT
-          doc.text(nameStr, COLS.name.x + 1, midY)
+          const nameRaw = pdfSafe(entry.name)
+          const nameStr = nameRaw.length > 24 ? nameRaw.slice(0, 23) + '...' : nameRaw
+          txt(nameStr, COLS[1].x + 1, midY, {
+            size: 8, bold: entry.rank <= 3, color: C.white,
+          })
 
-          // Match pts
-          textCol(C.grayLight)
-          doc.setFontSize(7.5)
-          doc.setFont('helvetica', 'normal')
-          doc.text(`${entry.matchPoints + entry.pendingPoints}`, COLS.match.x + COLS.match.w / 2, midY, { align: 'center' })
+          // Stat columns
+          const stats = [
+            entry.matchPoints + entry.pendingPoints,
+            entry.groupPoints,
+            entry.specialPoints,
+            entry.questionPoints,
+          ]
+          stats.forEach((val, si) => {
+            const col = COLS[2 + si]
+            txt(`${val}`, col.x + col.w / 2, midY, {
+              align: 'center', size: 7.5, color: C.grayLt,
+            })
+          })
 
-          // Group pts
-          doc.text(`${entry.groupPoints}`, COLS.group.x + COLS.group.w / 2, midY, { align: 'center' })
-
-          // Special pts
-          doc.text(`${entry.specialPoints}`, COLS.special.x + COLS.special.w / 2, midY, { align: 'center' })
-
-          // Question pts
-          doc.text(`${entry.questionPoints}`, COLS.quest.x + COLS.quest.w / 2, midY, { align: 'center' })
-
-          // Total (highlighted)
-          const [r,g,b] = hex2rgb(entry.rank <= 3 ? rankColor(entry.rank) : C.gold)
-          doc.setFillColor(r, g, b)
-          textCol(entry.rank <= 3 ? rankColor(entry.rank) : C.gold)
-          doc.setFontSize(8.5)
-          doc.setFont('helvetica', 'bold')
-          doc.text(`${confirmed}`, COLS.total.x + COLS.total.w / 2, midY, { align: 'center' })
+          // Total — colored only for top 3, white otherwise
+          const totalCol = COLS[6]
+          txt(`${pts}`, totalCol.x + totalCol.w / 2, midY, {
+            align: 'center', size: 8.5, bold: true,
+            color: entry.rank <= 3 ? color : C.white,
+          })
 
           // Row separator
-          stroke(C.border)
+          setStroke(C.border)
           doc.setLineWidth(0.2)
-          doc.line(14, rowY + ROW_H - 0.5, W - 14, rowY + ROW_H - 0.5)
+          doc.line(14, ry + ROW_H - 0.5, W - 14, ry + ROW_H - 0.5)
         })
 
-        pageFooter(pageNum, totalPages)
+        footer(p + 2)
       }
 
-      for (let p = 0; p < totalDetailPages; p++) {
-        drawTablePage(p * rowsPerPage, p + 2)
-      }
-
-      // Fix page 1 footer total
-      // (already drawn above correctly)
-
-      const dateStr = now.toLocaleDateString('es-CL', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
-      const safeName = pollaName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').slice(0, 30)
-      doc.save(`Polla_${safeName}_${dateStr}.pdf`)
+      // Save
+      const fileDateStr = now.toLocaleDateString('es-CL', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      }).replace(/\//g, '-')
+      const safeName = pdfSafe(pollaName).replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').slice(0, 30)
+      doc.save(`Polla_${safeName}_${fileDateStr}.pdf`)
     } finally {
       setLoading(false)
     }
