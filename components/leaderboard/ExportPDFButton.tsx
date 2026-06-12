@@ -40,6 +40,11 @@ function rankColor(rank: number) {
   return C.gray
 }
 
+// Strip diacritics so jsPDF/Helvetica renders names without encoding artifacts
+function pdfText(str: string): string {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x00-\xFF]/g, '')
+}
+
 type Props = {
   entries: LeaderboardEntry[]
   pollaName: string
@@ -115,12 +120,13 @@ export default function ExportPDFButton({
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIFA WORLD CUP 2026', W / 2, 20, { align: 'center', charSpace: 2 })
+      doc.setCharSpace(0)
 
       // Polla name
       textCol(C.white)
       doc.setFontSize(26)
       doc.setFont('helvetica', 'bold')
-      const pollaLines = doc.splitTextToSize(pollaName.toUpperCase(), 180)
+      const pollaLines = doc.splitTextToSize(pdfText(pollaName).toUpperCase(), 180)
       doc.text(pollaLines, W / 2, 34, { align: 'center' })
 
       // Gold divider
@@ -133,6 +139,7 @@ export default function ExportPDFButton({
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
       doc.text('TABLA DE POSICIONES', W / 2, divY + 7, { align: 'center', charSpace: 1.5 })
+      doc.setCharSpace(0)
       textCol(C.gray)
       doc.setFontSize(7)
       doc.setFont('helvetica', 'normal')
@@ -145,7 +152,7 @@ export default function ExportPDFButton({
       let cy = divY + 22
 
       // ── PODIUM BOX ────────────────────────────────────────────────────────
-      const podiumH = 58
+      const podiumH = 65
       bg(14, cy, W - 28, podiumH, C.navyCard, 4)
       stroke(C.border)
       doc.setLineWidth(0.3)
@@ -156,13 +163,16 @@ export default function ExportPDFButton({
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
       doc.text('PODIO', W / 2, cy + 7, { align: 'center', charSpace: 2 })
+      doc.setCharSpace(0)
 
       const top3 = entries.slice(0, 3)
       // Order: 2nd | 1st | 3rd
       const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3
       const podiumX = [W / 2 - 48, W / 2, W / 2 + 48]
-      const podiumBarH = [18, 26, 14]  // heights matching rank visual
-      const podiumBarY = [cy + podiumH - 20, cy + podiumH - 28, cy + podiumH - 16]
+      // Bars all end at cy+61; heights differ by rank (1st tallest)
+      const barBottom = cy + podiumH - 4            // cy + 61
+      const podiumBarH = [12, 16, 8]                // [2nd, 1st, 3rd]
+      const podiumBarY = podiumBarH.map(h => barBottom - h)
 
       podiumOrder.forEach((entry, i) => {
         const px = podiumX[i]
@@ -175,18 +185,18 @@ export default function ExportPDFButton({
         textCol(C.white)
         doc.setFontSize(7)
         doc.setFont('helvetica', 'bold')
-        const initials = entry.name.slice(0, 2).toUpperCase()
+        const initials = pdfText(entry.name).slice(0, 2).toUpperCase()
         doc.text(initials, px, cy + 22.5, { align: 'center' })
 
         // Name
         textCol(C.white)
         doc.setFontSize(6.5)
         doc.setFont('helvetica', 'bold')
-        const nameTrunc = entry.name.length > 12 ? entry.name.slice(0, 11) + '…' : entry.name
+        const rawName = pdfText(entry.name)
+        const nameTrunc = rawName.length > 12 ? rawName.slice(0, 11) + '...' : rawName
         doc.text(nameTrunc, px, cy + 31, { align: 'center' })
 
         // Points
-        doc.setFillColor(r, g, b)
         doc.setFontSize(11)
         doc.setFont('helvetica', 'bold')
         textCol(color)
@@ -196,7 +206,7 @@ export default function ExportPDFButton({
         doc.setFontSize(6)
         doc.text('pts', px, cy + 42, { align: 'center' })
 
-        // Podium bar
+        // Podium bar — starts at cy+45/cy+49/cy+53, safely below pts text
         doc.setFillColor(r, g, b)
         const barW = 28
         doc.roundedRect(px - barW / 2, podiumBarY[i], barW, podiumBarH[i], 2, 2, 'F')
@@ -252,7 +262,8 @@ export default function ExportPDFButton({
       textCol(C.goldLight)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
-      doc.text('CLASIFICACIÓN GENERAL', 20, cy + 1, { charSpace: 1.5 })
+      doc.text('CLASIFICACION GENERAL', 20, cy + 1, { charSpace: 1.5 })
+      doc.setCharSpace(0)
       fill(C.gold)
       doc.rect(20, cy + 3, W - 40, 0.4, 'F')
       cy += 7
@@ -275,7 +286,8 @@ export default function ExportPDFButton({
         textCol(C.white)
         doc.setFontSize(8)
         doc.setFont('helvetica', entry.rank <= 3 ? 'bold' : 'normal')
-        const name = entry.name.length > 28 ? entry.name.slice(0, 27) + '…' : entry.name
+        const rawName10 = pdfText(entry.name)
+        const name = rawName10.length > 28 ? rawName10.slice(0, 27) + '...' : rawName10
         doc.text(name, 35, rowY + 2.5)
 
         // Dotted line
@@ -314,13 +326,13 @@ export default function ExportPDFButton({
       const TABLE_TOP = 38
       const PAGE_BOTTOM = 282
       const COLS = {
-        rank:    { x: 14,  w: 10,  label: '#',       align: 'center' as const },
-        name:    { x: 27,  w: 72,  label: 'Nombre',  align: 'left' as const },
-        match:   { x: 102, w: 18,  label: '⚽ Part.', align: 'center' as const },
-        group:   { x: 122, w: 18,  label: '🏅 Grup.', align: 'center' as const },
-        special: { x: 142, w: 18,  label: '⭐ Esp.', align: 'center' as const },
-        quest:   { x: 162, w: 16,  label: '❓ Preg.', align: 'center' as const },
-        total:   { x: 181, w: 15,  label: 'TOTAL',   align: 'center' as const },
+        rank:    { x: 14,  w: 10,  label: '#',      align: 'center' as const },
+        name:    { x: 27,  w: 72,  label: 'Nombre', align: 'left' as const },
+        match:   { x: 102, w: 18,  label: 'Part.',  align: 'center' as const },
+        group:   { x: 122, w: 18,  label: 'Grup.',  align: 'center' as const },
+        special: { x: 142, w: 18,  label: 'Esp.',   align: 'center' as const },
+        quest:   { x: 162, w: 16,  label: 'Preg.',  align: 'center' as const },
+        total:   { x: 181, w: 15,  label: 'TOTAL',  align: 'center' as const },
       }
 
       // Calculate total pages needed
@@ -347,14 +359,16 @@ export default function ExportPDFButton({
         doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
         doc.text('FIFA WORLD CUP 2026', W / 2, 12, { align: 'center', charSpace: 1.5 })
+        doc.setCharSpace(0)
         textCol(C.white)
         doc.setFontSize(14)
         doc.setFont('helvetica', 'bold')
-        doc.text(pollaName.toUpperCase(), W / 2, 22, { align: 'center' })
+        doc.text(pdfText(pollaName).toUpperCase(), W / 2, 22, { align: 'center' })
         textCol(C.goldLight)
         doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
-        doc.text('CLASIFICACIÓN DETALLADA', W / 2, 30, { align: 'center', charSpace: 1 })
+        doc.text('CLASIFICACION DETALLADA', W / 2, 30, { align: 'center', charSpace: 1 })
+        doc.setCharSpace(0)
 
         fill(C.gold)
         doc.rect(14, 33, W - 28, 0.5, 'F')
@@ -400,7 +414,8 @@ export default function ExportPDFButton({
           textCol(C.white)
           doc.setFontSize(8)
           doc.setFont('helvetica', entry.rank <= 3 ? 'bold' : 'normal')
-          const nameStr = entry.name.length > 22 ? entry.name.slice(0, 21) + '…' : entry.name
+          const rawNameT = pdfText(entry.name)
+          const nameStr = rawNameT.length > 22 ? rawNameT.slice(0, 21) + '...' : rawNameT
           doc.text(nameStr, COLS.name.x + 1, midY)
 
           // Match pts
