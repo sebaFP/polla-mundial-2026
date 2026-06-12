@@ -5,6 +5,7 @@ import { matches, predictions } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import LiveView from '@/components/live/LiveView'
+import ShareLeaderboardButton from '@/components/leaderboard/ShareLeaderboardButton'
 
 export const revalidate = 0
 
@@ -17,18 +18,22 @@ export default async function LivePage({ params }: { params: Promise<{ slug: str
 
   const config = await getPollaConfig(polla.id)
 
+  const isPublic = config.polla_visibility === 'public'
+
   if (!session) {
-    // Layout already blocks private pollas — but double-check here too
-    if (config.polla_visibility !== 'public') redirect('/login')
+    if (!isPublic) redirect('/login')
 
     const allMatches = await db.select().from(matches)
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gradient-gold">En Vivo</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Resultados en tiempo real · actualiza automáticamente
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gradient-gold">En Vivo</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Resultados en tiempo real · actualiza automáticamente
+            </p>
+          </div>
+          <ShareLeaderboardButton />
         </div>
         <LiveView
           initialMatches={allMatches}
@@ -53,11 +58,14 @@ export default async function LivePage({ params }: { params: Promise<{ slug: str
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gradient-gold">En Vivo</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Resultados en tiempo real · actualiza automáticamente
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gradient-gold">En Vivo</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Resultados en tiempo real · actualiza automáticamente
+          </p>
+        </div>
+        {isPublic && <ShareLeaderboardButton />}
       </div>
 
       <LiveView

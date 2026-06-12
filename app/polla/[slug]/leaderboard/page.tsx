@@ -43,7 +43,6 @@ export default async function PollaLeaderboardPage({ params }: { params: Promise
   }
 
   const isPublic = config.polla_visibility === 'public'
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/polla/${slug}/leaderboard`
 
   return (
     <div className="space-y-6">
@@ -52,7 +51,7 @@ export default async function PollaLeaderboardPage({ params }: { params: Promise
           <h1 className="text-2xl font-bold text-gradient-gold">Tabla de Posiciones</h1>
           <p className="text-muted-foreground text-sm mt-1">{polla.name}</p>
         </div>
-        {isPublic && <ShareLeaderboardButton url={shareUrl} />}
+        {isPublic && <ShareLeaderboardButton />}
       </div>
       {isPublicView && (
         <div className="glass-card p-4 flex items-center justify-between gap-4 text-sm">

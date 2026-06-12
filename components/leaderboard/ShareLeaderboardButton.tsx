@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 
-export default function ShareLeaderboardButton({ url }: { url: string }) {
+export default function ShareLeaderboardButton() {
   const [copied, setCopied] = useState(false)
 
   async function share() {
+    const url = window.location.href
     if (navigator.share) {
       await navigator.share({ url }).catch(() => {})
     } else {
