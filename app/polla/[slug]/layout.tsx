@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth/session'
 import { getPollaBySlug, getMemberRole, getPollaConfig } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import PollaNav from '@/components/PollaNav'
+import PublicPollaNav from '@/components/PublicPollaNav'
 import { db } from '@/lib/db'
 import { passwordResetRequests, pollaMembers } from '@/lib/db/schema'
 import { eq, count } from 'drizzle-orm'
@@ -24,11 +25,12 @@ export default async function PollaLayout({
     const config = await getPollaConfig(polla.id)
     if (config.polla_visibility !== 'public') redirect('/login')
 
-    // Public read-only layout — no nav, no membership check
+    // Public read-only layout — filtered nav, no membership check
     return (
       <div className="relative min-h-screen gradient-bg overflow-x-hidden">
         <div className="pattern-geo absolute inset-0" aria-hidden />
         <div className="relative z-10">
+          <PublicPollaNav pollaName={polla.name} pollaSlug={slug} />
           <main className="container mx-auto px-4 py-6 max-w-6xl">
             {children}
           </main>

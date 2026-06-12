@@ -16,7 +16,7 @@ type Props = {
   initialMatches: Match[]
   initialPredictions: Prediction[]
   initialLeaderboard: LeaderboardEntry[]
-  userId: string
+  userId: string | null
   pollaId: string
 }
 
@@ -84,7 +84,7 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
   )
 }
 
-function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string }) {
+function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string | null }) {
   const [showLive, setShowLive] = useState(false)
   const [showLiveGroups, setShowLiveGroups] = useState(false)
 

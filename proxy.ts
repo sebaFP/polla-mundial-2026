@@ -18,7 +18,9 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/favicon') ||
     /^\/polla\/[^/]+\/leaderboard$/.test(pathname) ||
-    /^\/api\/pollas\/[^/]+\/leaderboard$/.test(pathname)
+    /^\/api\/pollas\/[^/]+\/leaderboard$/.test(pathname) ||
+    /^\/polla\/[^/]+\/live$/.test(pathname) ||
+    /^\/api\/pollas\/[^/]+\/matches$/.test(pathname)
   ) {
     return NextResponse.next()
   }
