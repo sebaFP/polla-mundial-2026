@@ -42,6 +42,7 @@ export default async function PollaLeaderboardPage({ params }: { params: Promise
       <LeaderboardView
         currentUserId={session.userId}
         pollaId={polla.id}
+        pollaName={polla.name}
         prizePoolEnabled={prizePoolEnabled && inscriptionEnabled && fee > 0}
         totalPool={totalPool}
         currency={currency}

@@ -5,6 +5,7 @@ import { LeaderboardEntry } from '@/app/api/pollas/[pollaId]/leaderboard/route'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import ExportPDFButton from './ExportPDFButton'
 
 const POLL_INTERVAL = 30_000 // 30s
 
@@ -85,6 +86,7 @@ function Podium({ entries, showLive, showLiveGroups }: { entries: LeaderboardEnt
 type Props = {
   currentUserId: string
   pollaId: string
+  pollaName: string
   prizePoolEnabled: boolean
   totalPool: number
   currency: string
@@ -97,7 +99,7 @@ function formatAmount(n: number, currency: string) {
   return `${currency} ${n.toLocaleString('es-CL')}`
 }
 
-export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
+export default function LeaderboardView({ currentUserId, pollaId, pollaName, prizePoolEnabled, totalPool, currency, prize1Pct, prize2Pct, prize3Pct }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [showLive, setShowLive] = useState(false)
@@ -157,35 +159,45 @@ export default function LeaderboardView({ currentUserId, pollaId, prizePoolEnabl
 
   return (
     <div className="space-y-4">
-      {(hasLiveMatches || hasLiveGroups) && (
-        <div className="flex flex-wrap gap-2">
-          {hasLiveMatches && (
-            <button
-              onClick={() => setShowLive(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                showLive
-                  ? 'bg-red-950/40 border-red-700/50 text-red-300'
-                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
-              Partidos en vivo
-            </button>
-          )}
-          {hasLiveGroups && (
-            <button
-              onClick={() => setShowLiveGroups(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                showLiveGroups
-                  ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
-                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              🏅 Grupos en curso
-            </button>
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        {hasLiveMatches && (
+          <button
+            onClick={() => setShowLive(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              showLive
+                ? 'bg-red-950/40 border-red-700/50 text-red-300'
+                : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
+            Partidos en vivo
+          </button>
+        )}
+        {hasLiveGroups && (
+          <button
+            onClick={() => setShowLiveGroups(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              showLiveGroups
+                ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+                : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🏅 Grupos en curso
+          </button>
+        )}
+        <div className="ml-auto">
+          <ExportPDFButton
+            entries={displayEntries}
+            pollaName={pollaName}
+            prizePoolEnabled={prizePoolEnabled}
+            totalPool={totalPool}
+            currency={currency}
+            prize1Pct={prize1Pct}
+            prize2Pct={prize2Pct}
+            prize3Pct={prize3Pct}
+          />
         </div>
-      )}
+      </div>
 
       {prizePoolEnabled && totalPool > 0 && (
         <div className="rounded-2xl overflow-hidden">
