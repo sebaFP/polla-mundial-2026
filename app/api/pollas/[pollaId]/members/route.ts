@@ -39,11 +39,15 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
   // Attach QR tokens (only admins can see these)
   if (role === 'admin') {
-    const invs = await db.select({ userId: invitations.userId, token: invitations.token })
+    const invs = await db.select({ userId: invitations.userId, token: invitations.token, usedAt: invitations.usedAt })
       .from(invitations)
       .where(eq(invitations.pollaId, pollaId))
-    const tokenMap = Object.fromEntries(invs.map(i => [i.userId, i.token]))
-    return NextResponse.json(members.map(m => ({ ...m, qrToken: tokenMap[m.userId] ?? null })))
+    const tokenMap = Object.fromEntries(invs.map(i => [i.userId, { token: i.token, usedAt: i.usedAt }]))
+    return NextResponse.json(members.map(m => ({
+      ...m,
+      qrToken: tokenMap[m.userId]?.token ?? null,
+      invitationUsedAt: tokenMap[m.userId]?.usedAt ?? null,
+    })))
   }
 
   return NextResponse.json(members)

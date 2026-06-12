@@ -9,6 +9,7 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith('/join/') ||
     pathname.startsWith('/invite/') ||
     pathname.startsWith('/api/invite/') ||
+    pathname.startsWith('/api/join/') ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/reset-password' ||

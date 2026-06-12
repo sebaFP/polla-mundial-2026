@@ -40,7 +40,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       .innerJoin(users, eq(pollaMembers.userId, users.id))
       .where(eq(pollaMembers.pollaId, polla.id)),
 
-    db.select({ userId: invitations.userId, token: invitations.token })
+    db.select({ userId: invitations.userId, token: invitations.token, usedAt: invitations.usedAt })
       .from(invitations)
       .where(eq(invitations.pollaId, polla.id)),
 
@@ -81,7 +81,7 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       : Promise.resolve([{ count: 0 }]),
   ])
 
-  const tokenMap = Object.fromEntries(invs.map(i => [i.userId, i.token]))
+  const tokenMap = Object.fromEntries(invs.map(i => [i.userId, { token: i.token, usedAt: i.usedAt }]))
   const ptsMap = Object.fromEntries(pts.map(r => [r.userId, { total: Number(r.total), predicted: Number(r.predicted) }]))
   const grpMap = Object.fromEntries(grpCounts.map(r => [r.userId, Number(r.count)]))
   const spcMap = Object.fromEntries(spcCounts.map(r => [r.userId, Number(r.count)]))
@@ -94,7 +94,8 @@ export default async function PollaParticipantsPage({ params }: { params: Promis
       ...m,
       totalPoints: ptsMap[m.userId]?.total ?? 0,
       predictedMatches: ptsMap[m.userId]?.predicted ?? 0,
-      qrToken: tokenMap[m.userId] ?? null,
+      qrToken: tokenMap[m.userId]?.token ?? null,
+      invitationUsedAt: tokenMap[m.userId]?.usedAt?.toISOString() ?? null,
       groupPredCount: grpMap[m.userId] ?? 0,
       specialPredCount: spcMap[m.userId] ?? 0,
       questionsAnswered: ansMap[m.userId] ?? 0,

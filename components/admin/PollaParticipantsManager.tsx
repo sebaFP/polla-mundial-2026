@@ -23,6 +23,7 @@ type Member = {
   totalPoints: number
   predictedMatches: number
   qrToken: string | null
+  invitationUsedAt: string | null
   groupPredCount: number
   specialPredCount: number
   questionsAnswered: number
@@ -83,6 +84,7 @@ export default function PollaParticipantsManager({
   const [email, setEmail] = useState('')
   const [creating, setCreating] = useState(false)
   const [selectedQR, setSelectedQR] = useState<Member | null>(null)
+  const [qrConfirmPending, setQrConfirmPending] = useState<Member | null>(null)
 
   type InviteLink = { id: string; token: string; label: string | null; createdAt: string | null; url?: string }
   const [inviteLinks, setInviteLinks] = useState<InviteLink[]>([])
@@ -169,7 +171,7 @@ export default function PollaParticipantsManager({
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
-      setParticipants(prev => [...prev, { ...data, totalPoints: 0, predictedMatches: 0, groupPredCount: 0, specialPredCount: 0, questionsAnswered: 0 }])
+      setParticipants(prev => [...prev, { ...data, totalPoints: 0, predictedMatches: 0, groupPredCount: 0, specialPredCount: 0, questionsAnswered: 0, invitationUsedAt: null }])
       setName('')
       setEmail('')
       toast.success(`¡${data.name} agregado!`)
@@ -411,7 +413,12 @@ export default function PollaParticipantsManager({
                   <Eye className="h-3.5 w-3.5" />
                 </Button>
                 {p.qrToken && (
-                  <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedQR(p)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => p.invitationUsedAt ? setQrConfirmPending(p) : setSelectedQR(p)}
+                  >
                     QR
                   </Button>
                 )}
@@ -456,6 +463,28 @@ export default function PollaParticipantsManager({
           </Card>
         )}
       </div>
+
+      {/* QR confirm dialog — shown when invitation was already used */}
+      {qrConfirmPending && (
+        <Dialog open onOpenChange={() => setQrConfirmPending(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Enlace ya utilizado</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              <strong>{qrConfirmPending.name}</strong> ya usó este enlace. Puedes compartirlo de nuevo; si el destinatario ya tiene sesión con otra cuenta, se le pedirá vincular su perfil.
+            </p>
+            <div className="flex gap-2 justify-end mt-2">
+              <Button variant="ghost" size="sm" onClick={() => setQrConfirmPending(null)}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={() => { setSelectedQR(qrConfirmPending); setQrConfirmPending(null) }}>
+                Ver QR de todos modos
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* QR Modal */}
       {selectedQR && (

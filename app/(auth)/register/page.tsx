@@ -58,6 +58,10 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          Si recibiste un enlace o código QR de invitación, úsalo directamente — no necesitas registrarte aquí.
+        </div>
+
         <Card className="glass-card" style={{ borderColor: 'oklch(0.32 0.13 262 / 0.3)' }}>
           <CardHeader>
             <CardTitle className="text-xl font-bold">Crear cuenta</CardTitle>
