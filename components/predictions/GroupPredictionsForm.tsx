@@ -15,6 +15,7 @@ type Props = {
   standings: GroupStanding[]
   pollaId: string
   lockedGroupNames?: string[]
+  predictionUnlocked?: boolean
 }
 
 type PredState = {
@@ -32,8 +33,8 @@ function isGroupLocked(groupName: string, matches: Match[]): boolean {
   return first.lockTime ? new Date() >= new Date(first.lockTime) : false
 }
 
-export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings, pollaId, lockedGroupNames = [] }: Props) {
-  const adminLockedSet = new Set(lockedGroupNames)
+export default function GroupPredictionsForm({ groupsMap, initialPredictions, matches, standings, pollaId, lockedGroupNames = [], predictionUnlocked = false }: Props) {
+  const adminLockedSet = predictionUnlocked ? new Set<string>() : new Set(lockedGroupNames)
 
   const [preds, setPreds] = useState<Record<string, PredState>>(() => {
     const map: Record<string, PredState> = {}
@@ -121,7 +122,7 @@ export default function GroupPredictionsForm({ groupsMap, initialPredictions, ma
       {groups.map(groupName => {
         const teams = groupsMap[groupName]
         const pred = preds[groupName]
-        const locked = isGroupLocked(groupName, matches)
+        const locked = !predictionUnlocked && isGroupLocked(groupName, matches)
         const adminLocked = adminLockedSet.has(groupName)
         const groupStandings = standings
           .filter(s => s.groupName === groupName)

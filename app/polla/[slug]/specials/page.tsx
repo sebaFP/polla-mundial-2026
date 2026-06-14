@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { matches, specialPredictions, pollaMembers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getPollaBySlug, getPollaConfig, getMemberRole } from '@/lib/polla'
+import { getPollaBySlug, getPollaConfig, getMemberRole, isMemberPredictionUnlocked } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import SpecialPredictionsForm from '@/components/predictions/SpecialPredictionsForm'
 import PredictionTabs from '@/components/predictions/PredictionTabs'
@@ -18,13 +18,14 @@ export default async function PollaSpecialsPage({ params }: { params: Promise<{ 
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
-  const [allMatches, mySpecials, config, myRole] = await Promise.all([
+  const [allMatches, mySpecials, config, myRole, predictionUnlocked] = await Promise.all([
     db.select().from(matches).where(eq(matches.stage, 'GROUP_STAGE')),
     db.select().from(specialPredictions).where(
       and(eq(specialPredictions.userId, session.userId), eq(specialPredictions.pollaId, polla.id))
     ),
     getPollaConfig(polla.id),
     getMemberRole(polla.id, session.userId),
+    isMemberPredictionUnlocked(polla.id, session.userId),
   ])
 
   const isAdmin = myRole === 'admin'
@@ -40,7 +41,7 @@ export default async function PollaSpecialsPage({ params }: { params: Promise<{ 
     ...allMatches.map(m => m.team2),
   ])).filter(t => !t.startsWith('W') && !t.startsWith('L') && !t.startsWith('2')).sort()
 
-  const isLocked = allMatches.length > 0
+  const isLocked = !predictionUnlocked && allMatches.length > 0
     ? (() => {
         const first = allMatches.reduce((e, m) => new Date(m.matchDatetime) < new Date(e.matchDatetime) ? m : e)
         return first.lockTime ? new Date() >= new Date(first.lockTime) : false

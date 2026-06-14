@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { matches, predictions, pollaMembers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getPollaBySlug, getMemberRole, getPollaConfig } from '@/lib/polla'
+import { getPollaBySlug, getMemberRole, getPollaConfig, isMemberPredictionUnlocked } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import MatchPredictions from '@/components/predictions/MatchPredictions'
 import PredictionTabs from '@/components/predictions/PredictionTabs'
@@ -18,13 +18,14 @@ export default async function PollaPredictionsPage({ params }: { params: Promise
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
-  const [allMatches, myPredictions, myRole, config] = await Promise.all([
+  const [allMatches, myPredictions, myRole, config, predictionUnlocked] = await Promise.all([
     db.select().from(matches),
     db.select().from(predictions).where(
       and(eq(predictions.userId, session.userId), eq(predictions.pollaId, polla.id))
     ),
     getMemberRole(polla.id, session.userId),
     getPollaConfig(polla.id),
+    isMemberPredictionUnlocked(polla.id, session.userId),
   ])
 
   const isAdmin = myRole === 'admin'
@@ -60,6 +61,7 @@ export default async function PollaPredictionsPage({ params }: { params: Promise
         pollaId={polla.id}
         knockoutMode={config['knockout_prediction_mode'] ?? 'api'}
         lockMode={config['prediction_lock_mode'] ?? 'match'}
+        predictionUnlocked={predictionUnlocked}
       />
     </div>
   )

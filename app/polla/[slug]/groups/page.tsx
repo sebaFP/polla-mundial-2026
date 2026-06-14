@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { matches, groupPredictions, groupStandings, groupStandingLocks, pollaMembers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { getSession } from '@/lib/auth/session'
-import { getPollaBySlug, getMemberRole, getPollaConfig } from '@/lib/polla'
+import { getPollaBySlug, getMemberRole, getPollaConfig, isMemberPredictionUnlocked } from '@/lib/polla'
 import { redirect } from 'next/navigation'
 import GroupPredictionsForm from '@/components/predictions/GroupPredictionsForm'
 import PredictionTabs from '@/components/predictions/PredictionTabs'
@@ -18,7 +18,7 @@ export default async function PollaGroupsPage({ params }: { params: Promise<{ sl
   const polla = await getPollaBySlug(slug)
   if (!polla) redirect('/')
 
-  const [allMatches, myGroupPreds, standings, locks, myRole, config] = await Promise.all([
+  const [allMatches, myGroupPreds, standings, locks, myRole, config, predictionUnlocked] = await Promise.all([
     db.select().from(matches).where(eq(matches.stage, 'GROUP_STAGE')),
     db.select().from(groupPredictions).where(
       and(eq(groupPredictions.userId, session.userId), eq(groupPredictions.pollaId, polla.id))
@@ -27,6 +27,7 @@ export default async function PollaGroupsPage({ params }: { params: Promise<{ sl
     db.select({ groupName: groupStandingLocks.groupName }).from(groupStandingLocks),
     getMemberRole(polla.id, session.userId),
     getPollaConfig(polla.id),
+    isMemberPredictionUnlocked(polla.id, session.userId),
   ])
 
   const lockedGroupNames = new Set(locks.map(l => l.groupName))
@@ -75,6 +76,7 @@ export default async function PollaGroupsPage({ params }: { params: Promise<{ sl
         standings={standings}
         pollaId={polla.id}
         lockedGroupNames={[...lockedGroupNames]}
+        predictionUnlocked={predictionUnlocked}
       />
     </div>
   )

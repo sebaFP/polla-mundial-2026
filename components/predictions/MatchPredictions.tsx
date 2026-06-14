@@ -19,6 +19,7 @@ type Props = {
   pollaId: string
   knockoutMode?: string
   lockMode?: string
+  predictionUnlocked?: boolean
 }
 
 type PredictionMap = Record<number, { s1: number | string; s2: number | string; saved: boolean; points?: number | null }>
@@ -37,7 +38,7 @@ function getStatusBadge(match: Match, locked: boolean) {
   return <Badge variant="outline" className="text-xs text-muted-foreground border-border/50">Por jugar</Badge>
 }
 
-export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api', lockMode = 'match' }: Props) {
+export default function MatchPredictions({ matches, initialPredictions, userId, pollaId, knockoutMode = 'api', lockMode = 'match', predictionUnlocked = false }: Props) {
   const [liveMatches, setLiveMatches] = useState<Match[]>(matches)
   const [stage, setStage] = useState<string>('GROUP_STAGE')
   const [selectedGroup, setSelectedGroup] = useState<string>('')
@@ -137,6 +138,7 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
   }, [liveMatches, lockMode])
 
   function isLocked(match: Match): boolean {
+    if (predictionUnlocked) return false
     const t = lockTimeMap[match.id]
     return t ? new Date() >= t : false
   }
