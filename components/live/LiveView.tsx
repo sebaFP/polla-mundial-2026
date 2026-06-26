@@ -87,59 +87,126 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
 function MiniLeaderboard({ entries, userId }: { entries: LeaderboardEntry[]; userId: string | null }) {
   const [showLive, setShowLive] = useState(false)
   const [showLiveGroups, setShowLiveGroups] = useState(false)
+  const [includeMatches, setIncludeMatches] = useState(true)
+  const [includeGroups, setIncludeGroups] = useState(true)
+  const [includeSpecials, setIncludeSpecials] = useState(true)
+  const [includeQuestions, setIncludeQuestions] = useState(true)
 
   const hasLiveMatches = entries.some(e => e.livePoints > 0)
   const hasLiveGroups = entries.some(e => e.hasLiveGroups)
+  const hasQuestions = entries.some(e => e.questionPoints > 0)
 
   const displayEntries = useMemo(() => {
     const livePts = (e: LeaderboardEntry) =>
-      (showLive ? e.livePoints : 0) + (showLiveGroups ? e.liveGroupPoints : 0)
+      (showLive && includeMatches ? e.livePoints : 0) + (showLiveGroups && includeGroups ? e.liveGroupPoints : 0)
     const sorted = entries.map(e => ({ ...e })).sort(
-      (a, b) =>
-        (b.matchPoints + b.pendingPoints + b.groupPoints + b.specialPoints + b.questionPoints + livePts(b)) -
-        (a.matchPoints + a.pendingPoints + a.groupPoints + a.specialPoints + a.questionPoints + livePts(a))
+      (a, b) => {
+        const scoreB =
+          (includeMatches ? b.matchPoints + b.pendingPoints : 0) +
+          (includeGroups ? b.groupPoints : 0) +
+          (includeSpecials ? b.specialPoints : 0) +
+          (includeQuestions ? b.questionPoints : 0) +
+          livePts(b)
+        const scoreA =
+          (includeMatches ? a.matchPoints + a.pendingPoints : 0) +
+          (includeGroups ? a.groupPoints : 0) +
+          (includeSpecials ? a.specialPoints : 0) +
+          (includeQuestions ? a.questionPoints : 0) +
+          livePts(a)
+        return scoreB - scoreA
+      }
     )
     sorted.forEach((e, i) => { e.rank = i + 1 })
     return sorted
-  }, [entries, showLive, showLiveGroups])
+  }, [entries, showLive, showLiveGroups, includeMatches, includeGroups, includeSpecials, includeQuestions])
 
   if (entries.length === 0) return null
 
   return (
     <div className="space-y-1.5">
-      {(hasLiveMatches || hasLiveGroups) && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {hasLiveMatches && (
-            <button
-              onClick={() => setShowLive(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                showLive
-                  ? 'bg-red-950/40 border-red-700/50 text-red-300'
-                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
-              Partidos en vivo
-            </button>
-          )}
-          {hasLiveGroups && (
-            <button
-              onClick={() => setShowLiveGroups(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                showLiveGroups
-                  ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
-                  : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              🏅 Grupos en curso
-            </button>
-          )}
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <button
+          onClick={() => setIncludeMatches(v => !v)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all ${
+            includeMatches
+              ? 'bg-blue-950/40 border-blue-700/50 text-blue-300'
+              : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ⚽ Partidos
+        </button>
+        <button
+          onClick={() => setIncludeGroups(v => !v)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all ${
+            includeGroups
+              ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+              : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🏅 Grupos
+        </button>
+        <button
+          onClick={() => setIncludeSpecials(v => !v)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all ${
+            includeSpecials
+              ? 'bg-purple-950/40 border-purple-700/50 text-purple-300'
+              : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ⭐ Esp.
+        </button>
+        {hasQuestions && (
+          <button
+            onClick={() => setIncludeQuestions(v => !v)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              includeQuestions
+                ? 'bg-green-950/40 border-green-700/50 text-green-300'
+                : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            ❓ Preg.
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        {hasLiveMatches && includeMatches && (
+          <button
+            onClick={() => setShowLive(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              showLive
+                ? 'bg-red-950/40 border-red-700/50 text-red-300'
+                : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className={`inline-block w-1.5 h-1.5 rounded-full bg-red-500 ${showLive ? 'animate-live-pulse' : 'opacity-40'}`} />
+            En vivo
+          </button>
+        )}
+        {hasLiveGroups && includeGroups && (
+          <button
+            onClick={() => setShowLiveGroups(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              showLiveGroups
+                ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+                : 'bg-card/50 border-border/40 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🏅 Grupos en curso
+          </button>
+        )}
+      </div>
+
       {displayEntries.map(entry => {
         const isMe = entry.userId === userId
-        const confirmedPts = entry.matchPoints + entry.pendingPoints + entry.groupPoints + entry.specialPoints + entry.questionPoints
-        const extraPts = (showLive ? entry.livePoints : 0) + (showLiveGroups ? entry.liveGroupPoints : 0)
+        const confirmedPts =
+          (includeMatches ? entry.matchPoints + entry.pendingPoints : 0) +
+          (includeGroups ? entry.groupPoints : 0) +
+          (includeSpecials ? entry.specialPoints : 0) +
+          (includeQuestions ? entry.questionPoints : 0)
+        const extraPts =
+          (showLive && includeMatches ? entry.livePoints : 0) +
+          (showLiveGroups && includeGroups ? entry.liveGroupPoints : 0)
         const displayPts = confirmedPts + extraPts
         return (
           <div

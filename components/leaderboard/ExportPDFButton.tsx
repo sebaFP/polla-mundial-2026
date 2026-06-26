@@ -39,8 +39,19 @@ function fmtAmt(n: number, currency: string) {
   return `${currency} ${n.toLocaleString('es-CL')}`
 }
 
-function totalPts(e: LeaderboardEntry) {
-  return e.matchPoints + e.pendingPoints + e.groupPoints + e.specialPoints + e.questionPoints
+function totalPts(
+  e: LeaderboardEntry,
+  includeMatches: boolean,
+  includeGroups: boolean,
+  includeSpecials: boolean,
+  includeQuestions: boolean
+) {
+  return (
+    (includeMatches ? e.matchPoints + e.pendingPoints : 0) +
+    (includeGroups ? e.groupPoints : 0) +
+    (includeSpecials ? e.specialPoints : 0) +
+    (includeQuestions ? e.questionPoints : 0)
+  )
 }
 
 type Props = {
@@ -52,12 +63,20 @@ type Props = {
   prize1Pct: number
   prize2Pct: number
   prize3Pct: number
+  includeMatches?: boolean
+  includeGroups?: boolean
+  includeSpecials?: boolean
+  includeQuestions?: boolean
 }
 
 export default function ExportPDFButton({
   entries, pollaName,
   prizePoolEnabled, totalPool, currency,
   prize1Pct, prize2Pct, prize3Pct,
+  includeMatches = true,
+  includeGroups = true,
+  includeSpecials = true,
+  includeQuestions = true,
 }: Props) {
   const [loading, setLoading] = useState(false)
 
@@ -211,7 +230,7 @@ export default function ExportPDFButton({
           })
 
           // Points
-          txt(`${totalPts(entry)}`, px, cy + 40, {
+          txt(`${totalPts(entry, includeMatches, includeGroups, includeSpecials, includeQuestions)}`, px, cy + 40, {
             align: 'center', size: 12, bold: true, color,
           })
           txt('pts', px, cy + 44.5, {
@@ -280,7 +299,7 @@ export default function ExportPDFButton({
         if (i % 2 === 0) rect(podL, ry - 3.5, podW, 9, C.row)
 
         const color = rankColor(entry.rank)
-        const pts   = `${totalPts(entry)} pts`
+        const pts   = `${totalPts(entry, includeMatches, includeGroups, includeSpecials, includeQuestions)} pts`
 
         txt(`${entry.rank}°`, podL + 2, ry + 2.5, {
           size: 8, bold: true, color,
@@ -355,7 +374,7 @@ export default function ExportPDFButton({
           const ry   = TABLE_TOP + i * ROW_H
           const midY = ry + ROW_H / 2 + 1.5
           const color = rankColor(entry.rank)
-          const pts   = totalPts(entry)
+          const pts   = totalPts(entry, includeMatches, includeGroups, includeSpecials, includeQuestions)
 
           rect(14, ry - 0.5, W - 28, ROW_H, i % 2 === 0 ? C.row : C.navy)
 
@@ -380,10 +399,10 @@ export default function ExportPDFButton({
 
           // Stat columns
           const stats = [
-            entry.matchPoints + entry.pendingPoints,
-            entry.groupPoints,
-            entry.specialPoints,
-            entry.questionPoints,
+            includeMatches ? entry.matchPoints + entry.pendingPoints : 0,
+            includeGroups ? entry.groupPoints : 0,
+            includeSpecials ? entry.specialPoints : 0,
+            includeQuestions ? entry.questionPoints : 0,
           ]
           stats.forEach((val, si) => {
             const col = COLS[2 + si]
