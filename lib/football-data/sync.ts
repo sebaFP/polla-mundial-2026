@@ -76,16 +76,20 @@ async function recalcMatchPredictions(matchId: number, apiScore1: number, apiSco
     configCache[pid] = await getPollaConfig(pid)
   }
 
-  for (const pred of preds) {
+  const updatePromises = preds.map(async (pred) => {
     const config = pred.pollaId ? (configCache[pred.pollaId] ?? {}) : {}
     const override = pred.pollaId ? overrideMap.get(pred.pollaId) : undefined
     const score1 = override ? override.score1 : apiScore1
     const score2 = override ? override.score2 : apiScore2
     const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config)
-    await db.update(predictions)
-      .set({ points: pts, updatedAt: new Date() })
-      .where(eq(predictions.id, pred.id))
-  }
+    
+    if (pred.points !== pts) {
+      await db.update(predictions)
+        .set({ points: pts, updatedAt: new Date() })
+        .where(eq(predictions.id, pred.id))
+    }
+  })
+  await Promise.all(updatePromises)
 }
 
 export async function recalcGroupPredictions(groupName: string) {
@@ -102,11 +106,14 @@ export async function recalcGroupPredictions(groupName: string) {
     return (b.goalsFor ?? 0) - (a.goalsFor ?? 0)
   })
 
-  // Update position column in group_standings
+  // Update position column in group_standings only if changed
   for (let i = 0; i < sorted.length; i++) {
-    await db.update(groupStandings)
-      .set({ position: i + 1 })
-      .where(eq(groupStandings.id, sorted[i].id))
+    const newPos = i + 1
+    if (sorted[i].position !== newPos) {
+      await db.update(groupStandings)
+        .set({ position: newPos })
+        .where(eq(groupStandings.id, sorted[i].id))
+    }
   }
 
   const hasLock = lock.length > 0
@@ -133,15 +140,18 @@ export async function recalcGroupPredictions(groupName: string) {
     configCache[pid] = await getPollaConfig(pid)
   }
 
-  for (const gp of groupPreds) {
+  const updatePromises = groupPreds.map(async (gp) => {
     const config = gp.pollaId ? (configCache[gp.pollaId] ?? {}) : {}
     const { pointsFirst, pointsSecond } = calcGroupPoints(
       gp.firstPlace, gp.secondPlace, actualFirst, actualSecond, config
     )
-    await db.update(groupPredictions)
-      .set({ pointsFirst, pointsSecond })
-      .where(eq(groupPredictions.id, gp.id))
-  }
+    if (gp.pointsFirst !== pointsFirst || gp.pointsSecond !== pointsSecond) {
+      await db.update(groupPredictions)
+        .set({ pointsFirst, pointsSecond })
+        .where(eq(groupPredictions.id, gp.id))
+    }
+  })
+  await Promise.all(updatePromises)
 }
 
 // Normalize FD API group names ("Group A") to DB format ("GROUP_A")
@@ -154,6 +164,7 @@ async function syncCompetition(
   competitionCode: string,
   competitionId: number,
   result: SyncResult,
+  force: boolean,
 ) {
   // Load all existing matches for this competition (by externalId and by id)
   const existingRows = await db.select({
@@ -164,6 +175,12 @@ async function syncCompetition(
     team2:          matches.team2,
     team1Resolved:  matches.team1Resolved,
     team2Resolved:  matches.team2Resolved,
+    status:         matches.status,
+    score1:         matches.score1,
+    score2:         matches.score2,
+    score1Ht:       matches.score1Ht,
+    score2Ht:       matches.score2Ht,
+    groupName:      matches.groupName,
   }).from(matches).where(eq(matches.competitionId, competitionId))
 
   // Index by externalId for fast lookup
@@ -214,6 +231,23 @@ async function syncCompetition(
         const newTeam2 = fdTeam2Resolved ? fdm.awayTeam.name! : existing.team2
         const newTeam1Resolved = fdTeam1Resolved || !!existing.team1Resolved
         const newTeam2Resolved = fdTeam2Resolved || !!existing.team2Resolved
+
+        const changed =
+          existing.externalId !== externalId ||
+          existing.status !== newStatus ||
+          existing.score1 !== newScore1 ||
+          existing.score2 !== newScore2 ||
+          existing.score1Ht !== fdm.score.halfTime.home ||
+          existing.score2Ht !== fdm.score.halfTime.away ||
+          existing.team1 !== newTeam1 ||
+          existing.team2 !== newTeam2 ||
+          existing.team1Resolved !== newTeam1Resolved ||
+          existing.team2Resolved !== newTeam2Resolved ||
+          existing.groupName !== groupName
+
+        if (!changed && !force) {
+          continue
+        }
 
         const [updated] = await db.update(matches)
           .set({
@@ -276,8 +310,9 @@ async function syncCompetition(
   }
 }
 
-export async function syncResults(): Promise<SyncResult> {
+export async function syncResults(options?: { force?: boolean }): Promise<SyncResult> {
   const result: SyncResult = { seeded: 0, updated: 0, errors: [] }
+  const force = options?.force ?? false
 
   try {
     // Get distinct competitions used by active pollas
@@ -304,7 +339,7 @@ export async function syncResults(): Promise<SyncResult> {
 
     for (const { competitionCode, competitionId } of competitions) {
       try {
-        await syncCompetition(competitionCode, competitionId, result)
+        await syncCompetition(competitionCode, competitionId, result, force)
       } catch (err) {
         result.errors.push(`Competition ${competitionCode}: ${String(err)}`)
       }

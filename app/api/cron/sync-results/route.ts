@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const result = await syncResults()
+  const force = req.nextUrl.searchParams.get('force') === 'true'
+  const result = await syncResults({ force })
   return NextResponse.json({ ok: true, timestamp: new Date().toISOString(), ...result })
 }
 
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const secret = body?.secret ?? ''
+  const force = body?.force === true
 
   if (secret !== process.env.CRON_SECRET) {
     // Fall back to session-based auth for admin panel use
@@ -30,6 +32,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await syncResults()
+  const result = await syncResults({ force })
   return NextResponse.json({ ok: true, ...result })
 }
