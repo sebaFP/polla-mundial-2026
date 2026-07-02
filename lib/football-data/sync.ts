@@ -63,7 +63,10 @@ export async function rebuildGroupStandings(groupName: string) {
   }
 }
 
-async function recalcMatchPredictions(matchId: number, apiScore1: number, apiScore2: number) {
+async function recalcMatchPredictions(
+  matchId: number, apiScore1: number, apiScore2: number,
+  apiPenalties?: { home: number | null; away: number | null } | null,
+) {
   const preds = await db.select().from(predictions).where(eq(predictions.matchId, matchId))
 
   // Load per-polla overrides — pollas with an override use their own scores instead of API
@@ -81,8 +84,11 @@ async function recalcMatchPredictions(matchId: number, apiScore1: number, apiSco
     const override = pred.pollaId ? overrideMap.get(pred.pollaId) : undefined
     const score1 = override ? override.score1 : apiScore1
     const score2 = override ? override.score2 : apiScore2
-    const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config)
-    
+    const penalties = override?.score1Penalties != null
+      ? { home: override.score1Penalties, away: override.score2Penalties }
+      : apiPenalties
+    const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config, penalties)
+
     if (pred.points !== pts) {
       await db.update(predictions)
         .set({ points: pts, updatedAt: new Date() })
@@ -180,6 +186,8 @@ async function syncCompetition(
     score2:         matches.score2,
     score1Ht:       matches.score1Ht,
     score2Ht:       matches.score2Ht,
+    score1Penalties: matches.score1Penalties,
+    score2Penalties: matches.score2Penalties,
     groupName:      matches.groupName,
   }).from(matches).where(eq(matches.competitionId, competitionId))
 
@@ -201,6 +209,9 @@ async function syncCompetition(
       const lockTime = new Date(matchDatetime.getTime() - 15 * 60 * 1000)
       const newScore1 = fdm.score.fullTime.home
       const newScore2 = fdm.score.fullTime.away
+      const isPenaltyShootout = fdm.score.duration === 'PENALTY_SHOOTOUT'
+      const newScore1Penalties = isPenaltyShootout ? fdm.score.penalties?.home ?? null : null
+      const newScore2Penalties = isPenaltyShootout ? fdm.score.penalties?.away ?? null : null
       const newStatus = fdm.status
       const groupName = normalizeGroup(fdm.group)
 
@@ -239,6 +250,8 @@ async function syncCompetition(
           existing.score2 !== newScore2 ||
           existing.score1Ht !== fdm.score.halfTime.home ||
           existing.score2Ht !== fdm.score.halfTime.away ||
+          existing.score1Penalties !== newScore1Penalties ||
+          existing.score2Penalties !== newScore2Penalties ||
           existing.team1 !== newTeam1 ||
           existing.team2 !== newTeam2 ||
           existing.team1Resolved !== newTeam1Resolved ||
@@ -256,6 +269,8 @@ async function syncCompetition(
             score2:        newScore2,
             score1Ht:      fdm.score.halfTime.home,
             score2Ht:      fdm.score.halfTime.away,
+            score1Penalties: newScore1Penalties,
+            score2Penalties: newScore2Penalties,
             groupName,
             team1:         newTeam1,
             team2:         newTeam2,
@@ -287,6 +302,8 @@ async function syncCompetition(
           score2:        newScore2,
           score1Ht:      fdm.score.halfTime.home,
           score2Ht:      fdm.score.halfTime.away,
+          score1Penalties: newScore1Penalties,
+          score2Penalties: newScore2Penalties,
           lockTime,
         }).returning()
         upserted = inserted
@@ -297,7 +314,9 @@ async function syncCompetition(
 
       // Always recalculate predictions for finished matches (idempotent)
       if (newStatus === 'FINISHED' && newScore1 !== null && newScore2 !== null) {
-        await recalcMatchPredictions(upserted.id, newScore1, newScore2)
+        await recalcMatchPredictions(upserted.id, newScore1, newScore2, {
+          home: upserted.score1Penalties, away: upserted.score2Penalties,
+        })
 
         if (upserted.stage === 'GROUP_STAGE' && upserted.groupName) {
           await rebuildGroupStandings(upserted.groupName)

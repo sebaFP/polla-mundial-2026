@@ -21,7 +21,10 @@ export default async function PollaResultsPage({ params }: { params: Promise<{ s
   const overrides = await db.select().from(pollaResultOverrides)
     .where(eq(pollaResultOverrides.pollaId, polla.id))
 
-  const overrideMap = new Map(overrides.map(o => [o.matchId, { score1: o.score1, score2: o.score2 }]))
+  const overrideMap = new Map(overrides.map(o => [o.matchId, {
+    score1: o.score1, score2: o.score2,
+    score1Penalties: o.score1Penalties, score2Penalties: o.score2Penalties,
+  }]))
 
   const matchesWithOverrides = allMatches.map(m => ({
     ...m,

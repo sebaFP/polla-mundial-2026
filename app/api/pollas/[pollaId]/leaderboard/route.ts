@@ -130,7 +130,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       const override = overrideMap.get(pred.matchId)
       const s1 = override ? override.score1 : match.score1
       const s2 = override ? override.score2 : match.score2
-      const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, s1, s2, config)
+      const penalties = override?.score1Penalties != null
+        ? { home: override.score1Penalties, away: override.score2Penalties }
+        : { home: match.score1Penalties, away: match.score2Penalties }
+      const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, s1, s2, config, penalties)
 
       if (match.status === 'FINISHED') {
         // Only count if not already synced into predictions.points

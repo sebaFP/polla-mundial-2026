@@ -413,6 +413,43 @@ export default function ConfigPanel({ initialConfig, pollaId }: Props) {
 
           <Card className="glass-card">
             <CardHeader>
+              <CardTitle className="text-sm">⚽ Empates definidos por penales</CardTitle>
+              <CardDescription className="text-xs">Cómo puntuar un cruce que termina empatado y se define por penales</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { value: 'regular_time', label: 'Resultado en el tiempo', desc: 'El empate cuenta como empate para todos, sin importar quién ganó por penales' },
+                  { value: 'final_result', label: 'Resultado final (con penales)', desc: 'Si predijiste el ganador por penales (no el empate), igual recibís los puntos de tendencia' },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      (config.knockout_draw_scoring_mode ?? 'regular_time') === opt.value
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="knockout_draw_scoring_mode"
+                      value={opt.value}
+                      checked={(config.knockout_draw_scoring_mode ?? 'regular_time') === opt.value}
+                      onChange={() => update('knockout_draw_scoring_mode', opt.value)}
+                      className="mt-0.5 accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
               <CardTitle className="text-sm">🌐 Visibilidad</CardTitle>
               <CardDescription className="text-xs">Controla quién puede ver la tabla de posiciones</CardDescription>
             </CardHeader>

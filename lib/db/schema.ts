@@ -67,6 +67,8 @@ export const matches = pgTable('matches', {
   score2: integer('score2'),
   score1Ht: integer('score1_ht'),
   score2Ht: integer('score2_ht'),
+  score1Penalties: integer('score1_penalties'),
+  score2Penalties: integer('score2_penalties'),
   lockTime: timestamp('lock_time', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -143,6 +145,8 @@ export const pollaResultOverrides = pgTable('polla_result_overrides', {
   matchId: integer('match_id').notNull().references(() => matches.id, { onDelete: 'cascade' }),
   score1: integer('score1').notNull(),
   score2: integer('score2').notNull(),
+  score1Penalties: integer('score1_penalties'),
+  score2Penalties: integer('score2_penalties'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [unique().on(t.pollaId, t.matchId)])

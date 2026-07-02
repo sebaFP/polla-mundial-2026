@@ -12,6 +12,8 @@ export type FDMatch = {
   score: {
     fullTime: { home: number | null; away: number | null }
     halfTime: { home: number | null; away: number | null }
+    duration?: string // 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'
+    penalties?: { home: number | null; away: number | null }
   }
   venue: string | null
 }

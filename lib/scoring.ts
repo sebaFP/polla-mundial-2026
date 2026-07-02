@@ -40,7 +40,8 @@ export function getConfigValue(config: Config, key: string, fallback: number): n
 export function calcMatchPoints(
   pred1: number, pred2: number,
   real1: number, real2: number,
-  config: Config
+  config: Config,
+  penalties?: { home: number | null; away: number | null } | null
 ): number {
   // Coerce to numbers — DB drivers can return strings for integer columns
   const p1 = Number(pred1), p2 = Number(pred2)
@@ -49,8 +50,24 @@ export function calcMatchPoints(
     return getConfigValue(config, 'points_exact_score', 5)
   if ((p1 - p2) === (r1 - r2))
     return getConfigValue(config, 'points_goal_diff', 3)
+
+  const tendencyPoints = getConfigValue(config, 'points_tendency', 2)
   if (Math.sign(p1 - p2) === Math.sign(r1 - r2))
-    return getConfigValue(config, 'points_tendency', 2)
+    return tendencyPoints
+
+  // Knockout draw decided by penalties: 'final_result' mode credits a
+  // tendency hit to whoever picked the penalty-shootout winner, since the
+  // exact/diff comparison above already used the regular-time draw score.
+  if (
+    r1 === r2 &&
+    config.knockout_draw_scoring_mode === 'final_result' &&
+    penalties?.home != null && penalties?.away != null
+  ) {
+    const penaltyWinnerSign = Math.sign(penalties.home - penalties.away)
+    if (penaltyWinnerSign !== 0 && Math.sign(p1 - p2) === penaltyWinnerSign)
+      return tendencyPoints
+  }
+
   return 0
 }
 
@@ -134,6 +151,7 @@ export const DEFAULT_CONFIG: Config = {
   prediction_lock_minutes: '15',
   prediction_lock_mode: 'match',
   knockout_prediction_mode: 'api',
+  knockout_draw_scoring_mode: 'regular_time',
   polla_open: 'true',
   rules_text: '',
   inscription_enabled: 'false',

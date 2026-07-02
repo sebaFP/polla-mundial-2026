@@ -20,29 +20,40 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const myRole = await getMemberRole(pollaId, session.userId)
   if (myRole !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { score1, score2 } = await req.json()
+  const { score1, score2, score1Penalties, score2Penalties } = await req.json()
   if (typeof score1 !== 'number' || typeof score2 !== 'number') {
     return NextResponse.json({ error: 'Marcadores inválidos' }, { status: 400 })
   }
+  const penaltiesGiven = typeof score1Penalties === 'number' && typeof score2Penalties === 'number'
 
   const match = await db.select().from(matches).where(eq(matches.id, Number(matchId))).limit(1)
   if (match.length === 0) return NextResponse.json({ error: 'Partido no encontrado' }, { status: 404 })
 
   // Upsert override — does not touch global matches table
   await db.insert(pollaResultOverrides)
-    .values({ pollaId, matchId: Number(matchId), score1, score2 })
+    .values({
+      pollaId, matchId: Number(matchId), score1, score2,
+      score1Penalties: penaltiesGiven ? score1Penalties : null,
+      score2Penalties: penaltiesGiven ? score2Penalties : null,
+    })
     .onConflictDoUpdate({
       target: [pollaResultOverrides.pollaId, pollaResultOverrides.matchId],
-      set: { score1, score2, updatedAt: new Date() },
+      set: {
+        score1, score2,
+        score1Penalties: penaltiesGiven ? score1Penalties : null,
+        score2Penalties: penaltiesGiven ? score2Penalties : null,
+        updatedAt: new Date(),
+      },
     })
 
   const config = await getPollaConfig(pollaId)
+  const penalties = penaltiesGiven ? { home: score1Penalties, away: score2Penalties } : null
 
   const preds = await db.select().from(predictions)
     .where(and(eq(predictions.matchId, Number(matchId)), eq(predictions.pollaId, pollaId)))
 
   for (const pred of preds) {
-    const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config)
+    const pts = calcMatchPoints(pred.predictedScore1, pred.predictedScore2, score1, score2, config, penalties)
     await db.update(predictions)
       .set({ points: pts, updatedAt: new Date() })
       .where(eq(predictions.id, pred.id))
@@ -79,6 +90,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const match = await db.select().from(matches).where(eq(matches.id, Number(matchId))).limit(1)
   const apiScore1 = match[0]?.score1
   const apiScore2 = match[0]?.score2
+  const apiPenalties = { home: match[0]?.score1Penalties ?? null, away: match[0]?.score2Penalties ?? null }
 
   const config = await getPollaConfig(pollaId)
 
@@ -87,7 +99,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
 
   for (const pred of preds) {
     const pts = (apiScore1 !== null && apiScore2 !== null && apiScore1 !== undefined && apiScore2 !== undefined)
-      ? calcMatchPoints(pred.predictedScore1, pred.predictedScore2, apiScore1, apiScore2, config)
+      ? calcMatchPoints(pred.predictedScore1, pred.predictedScore2, apiScore1, apiScore2, config, apiPenalties)
       : null
     await db.update(predictions)
       .set({ points: pts, updatedAt: new Date() })

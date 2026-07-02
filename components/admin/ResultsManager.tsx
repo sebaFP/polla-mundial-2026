@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-type Override = { score1: number; score2: number }
+type Override = { score1: number; score2: number; score1Penalties?: number | null; score2Penalties?: number | null }
 type MatchWithOverride = Match & { override: Override | null }
 
 type Props = { initialMatches: MatchWithOverride[]; pollaId?: string }
@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: string | null }) {
 export default function ResultsManager({ initialMatches, pollaId }: Props) {
   const [matches, setMatches] = useState(initialMatches)
   const [stage, setStage] = useState<string>('GROUP_STAGE')
-  const [scores, setScores] = useState<Record<number, { s1: string; s2: string }>>({})
+  const [scores, setScores] = useState<Record<number, { s1: string; s2: string; p1: string; p2: string }>>({})
   const [saving, setSaving] = useState<number | null>(null)
   const [resetting, setResetting] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -75,6 +75,10 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
     const s2 = parseInt(score.s2)
     if (isNaN(s1) || isNaN(s2)) { toast.error('Marcadores inválidos'); return }
 
+    const p1 = parseInt(score.p1)
+    const p2 = parseInt(score.p2)
+    const penaltiesGiven = !isNaN(p1) && !isNaN(p2)
+
     setSaving(matchId)
     try {
       const endpoint = pollaId
@@ -83,12 +87,15 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score1: s1, score2: s2 }),
+        body: JSON.stringify({
+          score1: s1, score2: s2,
+          ...(penaltiesGiven ? { score1Penalties: p1, score2Penalties: p2 } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error); return }
       setMatches(prev => prev.map(m => m.id === matchId
-        ? { ...m, override: { score1: s1, score2: s2 } }
+        ? { ...m, override: { score1: s1, score2: s2, score1Penalties: penaltiesGiven ? p1 : null, score2Penalties: penaltiesGiven ? p2 : null } }
         : m
       ))
       setScores(prev => { const next = { ...prev }; delete next[matchId]; return next })
@@ -176,6 +183,13 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
                         {' - '}
                         {hasOverride ? match.override!.score2 : match.score2}
                       </span>
+                      {(() => {
+                        const p1 = hasOverride ? match.override!.score1Penalties : match.score1Penalties
+                        const p2 = hasOverride ? match.override!.score2Penalties : match.score2Penalties
+                        return p1 != null && p2 != null
+                          ? <span className="text-xs text-muted-foreground font-mono">(pen {p1}-{p2})</span>
+                          : null
+                      })()}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -183,7 +197,9 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
                         onClick={() => {
                           const s1 = hasOverride ? match.override!.score1 : match.score1
                           const s2 = hasOverride ? match.override!.score2 : match.score2
-                          setScores(prev => ({ ...prev, [match.id]: { s1: String(s1), s2: String(s2) } }))
+                          const p1 = hasOverride ? match.override!.score1Penalties : match.score1Penalties
+                          const p2 = hasOverride ? match.override!.score2Penalties : match.score2Penalties
+                          setScores(prev => ({ ...prev, [match.id]: { s1: String(s1), s2: String(s2), p1: p1 != null ? String(p1) : '', p2: p2 != null ? String(p2) : '' } }))
                         }}
                       >
                         ✏️
@@ -207,7 +223,7 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
                         min={0} max={30}
                         placeholder="0"
                         value={score?.s1 ?? ''}
-                        onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '' }), s1: e.target.value } }))}
+                        onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '', p1: '', p2: '' }), s1: e.target.value } }))}
                         className="w-12 h-8 text-center text-sm font-mono font-bold rounded border border-border bg-input text-foreground focus:border-primary focus:outline-none"
                       />
                       <span className="text-muted-foreground font-mono">-</span>
@@ -216,9 +232,31 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
                         min={0} max={30}
                         placeholder="0"
                         value={score?.s2 ?? ''}
-                        onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '' }), s2: e.target.value } }))}
+                        onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '', p1: '', p2: '' }), s2: e.target.value } }))}
                         className="w-12 h-8 text-center text-sm font-mono font-bold rounded border border-border bg-input text-foreground focus:border-primary focus:outline-none"
                       />
+                      {match.stage !== 'GROUP_STAGE' && score?.s1 !== undefined && score?.s1 === score?.s2 && score.s1 !== '' && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">pen.</span>
+                          <input
+                            type="number"
+                            min={0} max={30}
+                            placeholder="0"
+                            value={score?.p1 ?? ''}
+                            onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '', p1: '', p2: '' }), p1: e.target.value } }))}
+                            className="w-10 h-7 text-center text-xs font-mono rounded border border-border bg-input text-foreground focus:border-primary focus:outline-none"
+                          />
+                          <span className="text-muted-foreground font-mono text-xs">-</span>
+                          <input
+                            type="number"
+                            min={0} max={30}
+                            placeholder="0"
+                            value={score?.p2 ?? ''}
+                            onChange={e => setScores(prev => ({ ...prev, [match.id]: { ...(prev[match.id] ?? { s1: '', s2: '', p1: '', p2: '' }), p2: e.target.value } }))}
+                            className="w-10 h-7 text-center text-xs font-mono rounded border border-border bg-input text-foreground focus:border-primary focus:outline-none"
+                          />
+                        </div>
+                      )}
                       <Button
                         size="sm"
                         onClick={() => saveResult(match.id)}
