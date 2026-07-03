@@ -53,9 +53,16 @@ function ScoreCard({ match, pred }: { match: Match; pred?: Prediction }) {
 
           <div className="text-center shrink-0 min-w-16">
             {(isLive || isFinished) && match.score1 !== null ? (
-              <div className={`text-2xl font-black font-mono ${isLive ? 'text-primary' : 'text-foreground'}`}>
-                {match.score1} – {match.score2}
-              </div>
+              <>
+                <div className={`text-2xl font-black font-mono ${isLive ? 'text-primary' : 'text-foreground'}`}>
+                  {match.score1} – {match.score2}
+                </div>
+                {isFinished && match.score1Penalties != null && match.score2Penalties != null && (
+                  <div className="text-xs text-muted-foreground font-mono">
+                    (pen {match.score1Penalties}-{match.score2Penalties})
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-sm font-mono text-muted-foreground">vs</div>
             )}

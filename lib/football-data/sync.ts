@@ -207,9 +207,16 @@ async function syncCompetition(
       const externalId = String(fdm.id)
       const matchDatetime = new Date(fdm.utcDate)
       const lockTime = new Date(matchDatetime.getTime() - 15 * 60 * 1000)
-      const newScore1 = fdm.score.fullTime.home
-      const newScore2 = fdm.score.fullTime.away
       const isPenaltyShootout = fdm.score.duration === 'PENALTY_SHOOTOUT'
+      // football-data.org's fullTime includes the penalty-shootout goals on top of the
+      // real match score when duration is PENALTY_SHOOTOUT — use regularTime + extraTime
+      // instead so score1/score2 always reflect goals scored on the pitch, never penalties.
+      const newScore1 = isPenaltyShootout
+        ? (fdm.score.regularTime?.home ?? 0) + (fdm.score.extraTime?.home ?? 0)
+        : fdm.score.fullTime.home
+      const newScore2 = isPenaltyShootout
+        ? (fdm.score.regularTime?.away ?? 0) + (fdm.score.extraTime?.away ?? 0)
+        : fdm.score.fullTime.away
       const newScore1Penalties = isPenaltyShootout ? fdm.score.penalties?.home ?? null : null
       const newScore2Penalties = isPenaltyShootout ? fdm.score.penalties?.away ?? null : null
       const newStatus = fdm.status

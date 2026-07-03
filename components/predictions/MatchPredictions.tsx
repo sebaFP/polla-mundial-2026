@@ -328,8 +328,15 @@ export default function MatchPredictions({ matches, initialPredictions, userId, 
               {/* Score / inputs row */}
               {match.status === 'FINISHED' && match.score1 !== null ? (
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <div className="text-xl font-bold font-mono text-primary">
-                    {match.score1} - {match.score2}
+                  <div className="flex items-baseline gap-2">
+                    <div className="text-xl font-bold font-mono text-primary">
+                      {match.score1} - {match.score2}
+                    </div>
+                    {match.score1Penalties != null && match.score2Penalties != null && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        (pen {match.score1Penalties}-{match.score2Penalties})
+                      </span>
+                    )}
                   </div>
                   <div className="text-right">
                     {pred?.points !== undefined && pred?.points !== null && (

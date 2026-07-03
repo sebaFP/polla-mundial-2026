@@ -29,6 +29,7 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
   const [saving, setSaving] = useState<number | null>(null)
   const [resetting, setResetting] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [forceSync, setForceSync] = useState(false)
 
   const stages = useMemo(() => {
     const available = new Set(matches.map(m => m.stage))
@@ -48,7 +49,7 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
       const res = await fetch('/api/cron/sync-results', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: '' }),
+        body: JSON.stringify({ secret: '', force: forceSync }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -140,9 +141,20 @@ export default function ResultsManager({ initialMatches, pollaId }: Props) {
             </Button>
           ))}
         </div>
-        <Button variant="outline" size="sm" onClick={syncNow} disabled={syncing} className="text-xs">
-          {syncing ? '⟳ Sincronizando...' : '⟳ Sync API'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={forceSync}
+              onChange={e => setForceSync(e.target.checked)}
+              className="accent-primary"
+            />
+            Forzar resync completo
+          </label>
+          <Button variant="outline" size="sm" onClick={syncNow} disabled={syncing} className="text-xs">
+            {syncing ? '⟳ Sincronizando...' : '⟳ Sync API'}
+          </Button>
+        </div>
       </div>
 
       {/* Matches */}
